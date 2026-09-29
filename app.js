@@ -1,16 +1,18 @@
 /* =========================================================
    LEAN BITE MENU — app.js
+   Updated for the current data.js structure.
+
    Handles:
    - Categories
    - Offers
    - Search
    - Menu rendering
+   - Missing images / missing prices
    - Meal details modal
    - Cart
    - Local cart persistence
 
-   This front-end file does NOT connect to Odoo yet.
-   Odoo integration will be added later through a secure backend.
+   Odoo checkout is NOT connected yet.
    ========================================================= */
 
 (function () {
@@ -27,20 +29,24 @@
   }
 
   /* =========================================================
-     2) SHORTCUTS
+     2) DATA SHORTCUTS
      ========================================================= */
   var DATA = window.LEAN_BITE_DATA;
 
   var getMeals =
     window.getAvailableLeanBiteMeals ||
     function () {
-      return DATA.meals || [];
+      return (DATA.meals || []).filter(function (meal) {
+        return meal.available !== false;
+      });
     };
 
   var getOffers =
     window.getActiveLeanBiteOffers ||
     function () {
-      return DATA.offers || [];
+      return (DATA.offers || []).filter(function (offer) {
+        return offer.active !== false;
+      });
     };
 
   var getCategories =
@@ -54,12 +60,16 @@
     function (id) {
       return (DATA.meals || []).find(function (meal) {
         return meal.id === id;
-      });
+      }) || null;
     };
 
   var formatPrice =
     window.formatLeanBitePrice ||
     function (price) {
+      if (price === null || price === undefined || price === "") {
+        return "";
+      }
+
       return Number(price || 0).toLocaleString() + " IQD";
     };
 
@@ -119,7 +129,22 @@
   };
 
   /* =========================================================
-     5) LOCAL STORAGE
+     5) BRAND PLACEHOLDER IMAGE
+     ========================================================= */
+  var PLACEHOLDER_IMAGE =
+    "data:image/svg+xml;charset=UTF-8," +
+    encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="900" height="700" viewBox="0 0 900 700">' +
+        '<rect width="900" height="700" fill="#FFF8F2"/>' +
+        '<circle cx="760" cy="100" r="72" fill="#BED33B"/>' +
+        '<path d="M0 520 C150 430 220 610 390 520 C520 450 615 555 900 420 L900 700 L0 700 Z" fill="#F7B7A6"/>' +
+        '<text x="450" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" font-weight="700" fill="#EC4D29">Lean Bite</text>' +
+        '<text x="450" y="385" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#332824">Image coming soon</text>' +
+      "</svg>"
+    );
+
+  /* =========================================================
+     6) LOCAL STORAGE
      ========================================================= */
   function loadCart() {
     try {
@@ -160,7 +185,7 @@
   }
 
   /* =========================================================
-     6) GENERAL HELPERS
+     7) GENERAL HELPERS
      ========================================================= */
   function escapeHTML(value) {
     return String(value == null ? "" : value)
@@ -171,8 +196,20 @@
       .replace(/'/g, "&#039;");
   }
 
-  function safeImagePath(path) {
-    return path || "assets/images/placeholders/meal-placeholder.webp";
+  function hasValue(value) {
+    return value !== null && value !== undefined && value !== "";
+  }
+
+  function hasPrice(meal) {
+    return meal && hasValue(meal.price) && !Number.isNaN(Number(meal.price));
+  }
+
+  function getMealImage(meal) {
+    if (!meal || !meal.image) {
+      return PLACEHOLDER_IMAGE;
+    }
+
+    return meal.image;
   }
 
   function getCategoryName(categoryId) {
@@ -197,12 +234,26 @@
     return count === 1 ? "1 item" : count + " items";
   }
 
+  function formatMacroNumber(value) {
+    if (!hasValue(value)) {
+      return "";
+    }
+
+    var number = Number(value);
+
+    if (Number.isNaN(number)) {
+      return escapeHTML(value);
+    }
+
+    if (Number.isInteger(number)) {
+      return String(number);
+    }
+
+    return String(Math.round(number * 10) / 10);
+  }
+
   function createNutritionChip(label, value, suffix) {
-    if (
-      value === null ||
-      value === undefined ||
-      value === ""
-    ) {
+    if (!hasValue(value)) {
       return "";
     }
 
@@ -210,49 +261,77 @@
       '<span class="nutrition-chip">' +
       escapeHTML(label) +
       ": " +
-      escapeHTML(value) +
+      escapeHTML(formatMacroNumber(value)) +
       escapeHTML(suffix || "") +
       "</span>"
     );
   }
 
-  /* =========================================================
-     7) CATEGORIES
+  function createPriceHTML(meal, className) {
+    className = className || "meal-price";
+
+    if (!hasPrice(meal)) {
+      return (
+        '<span class="' +
+        escapeHTML(className) +
+        ' meal-price-pending">Price coming soon</span>'
+      );
+    }
+
+    return (
+      '<strong class="' +
+      escapeHTML(className) +
+      '">' +
+      escapeHTML(formatPrice(meal.price)) +
+      "</strong>"
+    );
+  }
+
+  function handleImageError(img) {
+    if (!img || img.dataset.placeholderApplied === "true") {
+      return;
+    }
+
+    img.dataset.placeholderApplied = "true";
+    img.src = PLACEHOLDER_IMAGE;
+  }
+
+  function attachImageFallbacks(scope) {
+    var root = scope || document;
+
+    root
+      .querySelectorAll("img[data-leanbite-image]")
+      .forEach(function (img) {
+        img.addEventListener(
+          "error",
+          function () {
+            handleImageError(img);
+          },
+          { once: true }
+        );
+      });
+  }  /* =========================================================
+     8) CATEGORIES
      ========================================================= */
   function renderCategories() {
     if (!els.categoryNavInner) {
       return;
     }
 
-    var existingAllButton =
-      els.categoryNavInner.querySelector('[data-category="all"]');
-
     els.categoryNavInner.innerHTML = "";
 
-    if (existingAllButton) {
-      existingAllButton.classList.toggle(
-        "is-active",
-        state.activeCategory === "all"
-      );
-      existingAllButton.setAttribute(
-        "aria-pressed",
-        state.activeCategory === "all" ? "true" : "false"
-      );
-      els.categoryNavInner.appendChild(existingAllButton);
-    } else {
-      var allButton = document.createElement("button");
-      allButton.className =
-        "category-pill" +
-        (state.activeCategory === "all" ? " is-active" : "");
-      allButton.type = "button";
-      allButton.dataset.category = "all";
-      allButton.setAttribute(
-        "aria-pressed",
-        state.activeCategory === "all" ? "true" : "false"
-      );
-      allButton.textContent = "All";
-      els.categoryNavInner.appendChild(allButton);
-    }
+    var allButton = document.createElement("button");
+    allButton.className =
+      "category-pill" +
+      (state.activeCategory === "all" ? " is-active" : "");
+    allButton.type = "button";
+    allButton.dataset.category = "all";
+    allButton.setAttribute(
+      "aria-pressed",
+      state.activeCategory === "all" ? "true" : "false"
+    );
+    allButton.textContent = "All";
+    els.categoryNavInner.appendChild(allButton);
 
     getCategories().forEach(function (category) {
       var button = document.createElement("button");
@@ -279,11 +358,18 @@
     renderCategories();
     renderMenu();
 
-    var activeButton = els.categoryNavInner
-      ? els.categoryNavInner.querySelector(
-          '[data-category="' + CSS.escape(state.activeCategory) + '"]'
-        )
-      : null;
+    if (!els.categoryNavInner) {
+      return;
+    }
+
+    var buttons = els.categoryNavInner.querySelectorAll("[data-category]");
+    var activeButton = null;
+
+    buttons.forEach(function (button) {
+      if (button.dataset.category === state.activeCategory) {
+        activeButton = button;
+      }
+    });
 
     if (activeButton) {
       activeButton.scrollIntoView({
@@ -295,7 +381,7 @@
   }
 
   /* =========================================================
-     8) OFFERS
+     9) OFFERS
      ========================================================= */
   function renderOffers() {
     if (!els.offersTrack || !els.offersSection) {
@@ -313,19 +399,17 @@
 
     els.offersTrack.innerHTML = offers
       .map(function (offer) {
-        var hasImage = Boolean(offer.image);
+        var image = offer.image || PLACEHOLDER_IMAGE;
 
         return (
           '<article class="offer-card" data-offer-id="' +
           escapeHTML(offer.id) +
           '">' +
-          (hasImage
-            ? '<img class="offer-card-image" src="' +
-              escapeHTML(safeImagePath(offer.image)) +
-              '" alt="' +
-              escapeHTML(offer.title || "Lean Bite offer") +
-              '" loading="lazy">'
-            : "") +
+          '<img class="offer-card-image" data-leanbite-image src="' +
+          escapeHTML(image) +
+          '" alt="' +
+          escapeHTML(offer.title || "Lean Bite offer") +
+          '" loading="lazy">' +
           '<div class="offer-card-overlay">' +
           '<h3 class="offer-card-title">' +
           escapeHTML(offer.title || "Lean Bite Offer") +
@@ -338,10 +422,12 @@
         );
       })
       .join("");
+
+    attachImageFallbacks(els.offersTrack);
   }
 
   /* =========================================================
-     9) MENU FILTERING
+     10) MENU FILTERING
      ========================================================= */
   function getFilteredMeals() {
     var meals = getMeals();
@@ -365,6 +451,7 @@
           meal.name,
           meal.description,
           meal.category,
+          getCategoryName(meal.category),
           meal.badge
         ].join(" ")
       );
@@ -374,7 +461,7 @@
   }
 
   /* =========================================================
-     10) MENU CARD RENDERING
+     11) MENU CARD RENDERING
      ========================================================= */
   function mealCardHTML(meal) {
     var nutrition = meal.nutrition || {};
@@ -382,7 +469,8 @@
     var nutritionHTML = [
       createNutritionChip("Kcal", nutrition.calories, ""),
       createNutritionChip("Protein", nutrition.protein, "g"),
-      createNutritionChip("Carbs", nutrition.carbs, "g")
+      createNutritionChip("Carbs", nutrition.carbs, "g"),
+      createNutritionChip("Fat", nutrition.fat, "g")
     ]
       .filter(Boolean)
       .join("");
@@ -395,8 +483,8 @@
       '">' +
 
       '<div class="meal-card-media">' +
-      '<img class="meal-card-image" src="' +
-      escapeHTML(safeImagePath(meal.image)) +
+      '<img class="meal-card-image" data-leanbite-image src="' +
+      escapeHTML(getMealImage(meal)) +
       '" alt="' +
       escapeHTML(meal.name) +
       '" loading="lazy">' +
@@ -406,6 +494,7 @@
           escapeHTML(meal.badge) +
           "</span>"
         : "") +
+
       "</div>" +
 
       '<div class="meal-card-body">' +
@@ -414,6 +503,7 @@
       '<p class="meal-card-category">' +
       escapeHTML(getCategoryName(meal.category)) +
       "</p>" +
+
       '<h3 class="meal-card-title">' +
       escapeHTML(meal.name) +
       "</h3>" +
@@ -432,17 +522,15 @@
         : "") +
 
       '<div class="meal-card-footer">' +
-      '<strong class="meal-price">' +
-      escapeHTML(formatPrice(meal.price)) +
-      "</strong>" +
+      createPriceHTML(meal, "meal-price") +
 
       '<button class="add-button" type="button" data-add-meal="' +
       escapeHTML(meal.id) +
       '" aria-label="Add ' +
       escapeHTML(meal.name) +
       ' to cart">+</button>' +
-      "</div>" +
 
+      "</div>" +
       "</div>" +
       "</article>"
     );
@@ -456,6 +544,8 @@
     var meals = getFilteredMeals();
 
     els.menuGrid.innerHTML = meals.map(mealCardHTML).join("");
+
+    attachImageFallbacks(els.menuGrid);
 
     if (els.resultsCount) {
       els.resultsCount.textContent = pluraliseItems(meals.length);
@@ -481,7 +571,7 @@
   }
 
   /* =========================================================
-     11) MEAL DETAILS MODAL
+     12) MEAL DETAILS MODAL
      ========================================================= */
   function openMealModal(mealId) {
     var meal = getMealById(mealId);
@@ -493,8 +583,12 @@
     state.selectedMealId = meal.id;
 
     if (els.mealModalImage) {
-      els.mealModalImage.src = safeImagePath(meal.image);
+      els.mealModalImage.dataset.placeholderApplied = "false";
+      els.mealModalImage.src = getMealImage(meal);
       els.mealModalImage.alt = meal.name || "Lean Bite meal";
+      els.mealModalImage.onerror = function () {
+        handleImageError(els.mealModalImage);
+      };
     }
 
     if (els.mealModalCategory) {
@@ -507,19 +601,29 @@
     }
 
     if (els.mealModalDescription) {
-      els.mealModalDescription.textContent =
-        meal.description || "";
+      if (meal.description) {
+        els.mealModalDescription.textContent = meal.description;
+        els.mealModalDescription.hidden = false;
+      } else {
+        els.mealModalDescription.textContent = "";
+        els.mealModalDescription.hidden = true;
+      }
     }
 
     if (els.mealModalPrice) {
-      els.mealModalPrice.textContent =
-        formatPrice(meal.price);
+      if (hasPrice(meal)) {
+        els.mealModalPrice.textContent = formatPrice(meal.price);
+        els.mealModalPrice.classList.remove("meal-price-pending");
+      } else {
+        els.mealModalPrice.textContent = "Price coming soon";
+        els.mealModalPrice.classList.add("meal-price-pending");
+      }
     }
 
     if (els.mealModalNutrition) {
       var nutrition = meal.nutrition || {};
 
-      els.mealModalNutrition.innerHTML = [
+      var nutritionHTML = [
         createNutritionChip("Calories", nutrition.calories, ""),
         createNutritionChip("Protein", nutrition.protein, "g"),
         createNutritionChip("Carbs", nutrition.carbs, "g"),
@@ -528,8 +632,8 @@
         .filter(Boolean)
         .join("");
 
-      els.mealModalNutrition.hidden =
-        !els.mealModalNutrition.innerHTML;
+      els.mealModalNutrition.innerHTML = nutritionHTML;
+      els.mealModalNutrition.hidden = !nutritionHTML;
     }
 
     if (typeof els.mealModal.showModal === "function") {
@@ -557,10 +661,8 @@
 
     state.selectedMealId = null;
     document.body.style.overflow = "";
-  }
-
-  /* =========================================================
-     12) CART LOGIC
+  }  /* =========================================================
+     13) CART LOGIC
      ========================================================= */
   function cleanCart() {
     state.cart = state.cart.filter(function (cartItem) {
@@ -626,12 +728,19 @@
     return state.cart.reduce(function (total, item) {
       var meal = getMealById(item.id);
 
-      if (!meal) {
+      if (!meal || !hasPrice(meal)) {
         return total;
       }
 
-      return total + (Number(meal.price) || 0) * item.qty;
+      return total + Number(meal.price) * item.qty;
     }, 0);
+  }
+
+  function cartHasUnpricedItems() {
+    return state.cart.some(function (item) {
+      var meal = getMealById(item.id);
+      return meal && !hasPrice(meal);
+    });
   }
 
   function cartItemHTML(item) {
@@ -641,13 +750,17 @@
       return "";
     }
 
+    var priceHTML = hasPrice(meal)
+      ? escapeHTML(formatPrice(meal.price))
+      : "Price coming soon";
+
     return (
       '<div class="cart-item" data-cart-id="' +
       escapeHTML(meal.id) +
       '">' +
 
-      '<img class="cart-item-image" src="' +
-      escapeHTML(safeImagePath(meal.image)) +
+      '<img class="cart-item-image" data-leanbite-image src="' +
+      escapeHTML(getMealImage(meal)) +
       '" alt="' +
       escapeHTML(meal.name) +
       '">' +
@@ -656,8 +769,9 @@
       '<p class="cart-item-name">' +
       escapeHTML(meal.name) +
       "</p>" +
+
       '<span class="cart-item-price">' +
-      escapeHTML(formatPrice(meal.price)) +
+      priceHTML +
       "</span>" +
       "</div>" +
 
@@ -665,9 +779,11 @@
       '<button type="button" data-cart-minus="' +
       escapeHTML(meal.id) +
       '" aria-label="Reduce quantity">−</button>' +
+
       "<span>" +
       escapeHTML(item.qty) +
       "</span>" +
+
       '<button type="button" data-cart-plus="' +
       escapeHTML(meal.id) +
       '" aria-label="Increase quantity">+</button>' +
@@ -682,6 +798,7 @@
 
     var count = getCartCount();
     var subtotal = getCartSubtotal();
+    var hasUnpricedItems = cartHasUnpricedItems();
 
     if (els.cartCount) {
       els.cartCount.textContent = count;
@@ -691,6 +808,8 @@
       els.cartItems.innerHTML = state.cart
         .map(cartItemHTML)
         .join("");
+
+      attachImageFallbacks(els.cartItems);
     }
 
     if (els.cartEmpty) {
@@ -702,7 +821,16 @@
     }
 
     if (els.cartSubtotal) {
-      els.cartSubtotal.textContent = formatPrice(subtotal);
+      if (state.cart.length === 0) {
+        els.cartSubtotal.textContent = formatPrice(0);
+      } else if (hasUnpricedItems && subtotal === 0) {
+        els.cartSubtotal.textContent = "Pending";
+      } else if (hasUnpricedItems) {
+        els.cartSubtotal.textContent =
+          formatPrice(subtotal) + " + pending items";
+      } else {
+        els.cartSubtotal.textContent = formatPrice(subtotal);
+      }
     }
   }
 
@@ -739,7 +867,7 @@
   }
 
   function animateCartCount() {
-    if (!els.cartCount) {
+    if (!els.cartCount || !els.cartCount.animate) {
       return;
     }
 
@@ -757,7 +885,7 @@
   }
 
   /* =========================================================
-     13) SEARCH
+     14) SEARCH
      ========================================================= */
   function openSearch() {
     if (!els.searchPanel) {
@@ -810,13 +938,10 @@
     }
 
     renderMenu();
-  }
-
-  /* =========================================================
-     14) EVENT LISTENERS
+  }  /* =========================================================
+     15) EVENT LISTENERS
      ========================================================= */
 
-  /* Category clicks */
   if (els.categoryNavInner) {
     els.categoryNavInner.addEventListener("click", function (event) {
       var button = event.target.closest("[data-category]");
@@ -829,7 +954,6 @@
     });
   }
 
-  /* Search controls */
   if (els.searchToggle) {
     els.searchToggle.addEventListener("click", toggleSearch);
   }
@@ -845,7 +969,6 @@
     });
   }
 
-  /* Menu cards + Add buttons */
   if (els.menuGrid) {
     els.menuGrid.addEventListener("click", function (event) {
       var addButton = event.target.closest("[data-add-meal]");
@@ -879,7 +1002,6 @@
     });
   }
 
-  /* Modal */
   if (els.mealModalClose) {
     els.mealModalClose.addEventListener("click", closeMealModal);
   }
@@ -909,7 +1031,6 @@
     });
   }
 
-  /* Cart */
   if (els.cartToggle) {
     els.cartToggle.addEventListener("click", openCart);
   }
@@ -938,7 +1059,6 @@
     });
   }
 
-  /* View all offers */
   if (els.viewAllOffers) {
     els.viewAllOffers.addEventListener("click", function () {
       if (!els.offersTrack) {
@@ -952,7 +1072,6 @@
     });
   }
 
-  /* Global keyboard behavior */
   document.addEventListener("keydown", function (event) {
     if (event.key !== "Escape") {
       return;
@@ -975,7 +1094,7 @@
   });
 
   /* =========================================================
-     15) INITIAL APP RENDER
+     16) INITIAL APP RENDER
      ========================================================= */
   function init() {
     renderCategories();
@@ -991,7 +1110,11 @@
         (DATA.settings.brandName || "Lean Bite");
     }
 
-    console.log("Lean Bite Menu front end loaded.");
+    console.log(
+      "Lean Bite Menu front end loaded with " +
+      getMeals().length +
+      " available items."
+    );
   }
 
   init();
