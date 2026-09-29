@@ -5,37 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <title>Lean Bite | Healthy Food Menu</title>
+
   <meta
     name="description"
-    content="Explore Lean Bite's healthy daily menu, offers, main dishes, sides, salads and more."
+    content="Explore the Lean Bite menu, discover healthy meals, check nutrition details and build your order."
   />
 
-  <meta name="theme-color" content="#FFF6EC" />
+  <meta name="theme-color" content="#FFF8F2" />
 
-  <!-- Fonts will be finalized in styles.css according to Lean Bite brand identity -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-  <!-- Main stylesheet -->
   <link rel="stylesheet" href="styles.css" />
 </head>
 
 <body>
-  <!-- =========================================================
-       APP SHELL
-       ========================================================= -->
   <div class="site-shell">
 
-    <!-- =======================================================
-         HEADER
-         ======================================================= -->
     <header class="site-header" id="top">
       <div class="container header-inner">
 
         <a class="brand" href="#top" aria-label="Lean Bite home">
-          <!-- Replace with final logo asset when uploaded -->
           <img
-            src="assets/images/logo/lean-bite-logo.svg"
+            src="assets/images/logo/lean-bite-logo-main.jpg"
             alt="Lean Bite"
             class="brand-logo"
           />
@@ -69,9 +61,6 @@
       </div>
     </header>
 
-    <!-- =======================================================
-         SEARCH PANEL
-         ======================================================= -->
     <section
       class="search-panel"
       id="searchPanel"
@@ -79,7 +68,9 @@
       hidden
     >
       <div class="container">
-        <label class="visually-hidden" for="menuSearch">Search menu</label>
+        <label class="visually-hidden" for="menuSearch">
+          Search menu
+        </label>
 
         <div class="search-field-wrap">
           <input
@@ -94,7 +85,6 @@
             class="search-clear"
             id="searchClear"
             type="button"
-            aria-label="Clear search"
           >
             Clear
           </button>
@@ -104,35 +94,42 @@
 
     <main>
 
-      <!-- =====================================================
-           INTRO / HERO
-           ===================================================== -->
       <section class="menu-intro">
-        <div class="container menu-intro-inner">
+        <div class="container">
+          <div class="menu-intro-inner">
 
-          <div class="menu-intro-copy">
-            <p class="eyebrow">Healthy choices. Made easy.</p>
+            <div class="menu-intro-copy">
+              <p class="eyebrow">
+                Healthy meals. Better habits.
+              </p>
 
-            <h1>Fresh food for your everyday routine.</h1>
+              <h1>
+                Real food.<br />
+                Brighter days.
+              </h1>
 
-            <p class="intro-text">
-              Pick what you feel like today. Explore the menu, choose your
-              favorites and build your order your way.
-            </p>
+              <p class="intro-text">
+                Fresh, balanced meals made for your everyday routine.
+                Explore the menu and build your order your way.
+              </p>
+
+              <a class="hero-cta" href="#menu">
+                Explore Menu
+              </a>
+            </div>
+
+            <div class="menu-intro-media">
+              <img
+                src="assets/images/brand/hero-food.jpg"
+                alt="Lean Bite healthy meals"
+                class="hero-image"
+              />
+            </div>
+
           </div>
-
-          <div class="menu-intro-art" aria-hidden="true">
-            <!-- Decorative Lean Bite brand element will be styled later -->
-            <div class="brand-shape brand-shape-one"></div>
-            <div class="brand-shape brand-shape-two"></div>
-          </div>
-
         </div>
       </section>
 
-      <!-- =====================================================
-           OFFERS
-           ===================================================== -->
       <section class="offers-section" aria-labelledby="offersTitle">
         <div class="container">
 
@@ -156,16 +153,11 @@
             id="offersTrack"
             aria-live="polite"
           >
-            <!-- Offers will be inserted from data.js -->
           </div>
 
         </div>
       </section>
 
-      <!-- =====================================================
-           STICKY CATEGORY NAVIGATION
-           Talabat-style horizontal categories
-           ===================================================== -->
       <nav
         class="category-nav"
         id="categoryNav"
@@ -182,15 +174,14 @@
             All
           </button>
 
-          <!-- Remaining category buttons will be created from data.js -->
-
         </div>
       </nav>
 
-      <!-- =====================================================
-           MENU RESULTS AREA
-           ===================================================== -->
-      <section class="menu-section" aria-labelledby="menuTitle">
+      <section
+        class="menu-section"
+        id="menu"
+        aria-labelledby="menuTitle"
+      >
         <div class="container">
 
           <div class="section-heading menu-heading">
@@ -198,7 +189,10 @@
               <p class="section-kicker" id="activeCategoryLabel">
                 Explore
               </p>
-              <h2 id="menuTitle">Our Menu</h2>
+
+              <h2 id="menuTitle">
+                Our Menu
+              </h2>
             </div>
 
             <p class="results-count" id="resultsCount">
@@ -211,7 +205,6 @@
             id="menuGrid"
             aria-live="polite"
           >
-            <!-- Meal cards will be rendered by app.js -->
           </div>
 
           <div
@@ -226,25 +219,63 @@
         </div>
       </section>
 
+      <section class="brand-story-section">
+        <div class="container">
+
+          <div class="brand-story-card">
+
+            <div class="brand-story-image">
+              <img
+                src="assets/images/brand/lifestyle-bag.jpg"
+                alt="Lean Bite branded food bag"
+                loading="lazy"
+              />
+            </div>
+
+            <div class="brand-story-copy">
+              <p class="section-kicker">
+                Lean Bite
+              </p>
+
+              <h2>
+                Fresh choices.<br />
+                Made easy.
+              </h2>
+
+              <p>
+                Healthy food designed to fit naturally into a busy day.
+              </p>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
     </main>
 
-    <!-- =======================================================
-         CART DRAWER
-         No checkout yet — cart only, as agreed.
-         ======================================================= -->
     <aside
       class="cart-drawer"
       id="cartDrawer"
       aria-labelledby="cartTitle"
       aria-hidden="true"
     >
-      <div class="cart-backdrop" id="cartBackdrop"></div>
+      <div
+        class="cart-backdrop"
+        id="cartBackdrop"
+      ></div>
 
       <div class="cart-panel">
+
         <div class="cart-header">
           <div>
-            <p class="section-kicker">Your selection</p>
-            <h2 id="cartTitle">Cart</h2>
+            <p class="section-kicker">
+              Your selection
+            </p>
+
+            <h2 id="cartTitle">
+              Cart
+            </h2>
           </div>
 
           <button
@@ -257,23 +288,34 @@
           </button>
         </div>
 
-        <div class="cart-items" id="cartItems">
-          <!-- Cart items will be rendered by app.js -->
+        <div
+          class="cart-items"
+          id="cartItems"
+        >
         </div>
 
-        <div class="cart-empty" id="cartEmpty">
+        <div
+          class="cart-empty"
+          id="cartEmpty"
+        >
           <p>Your cart is empty.</p>
           <span>Add anything you like from the menu.</span>
         </div>
 
-        <div class="cart-summary" id="cartSummary" hidden>
+        <div
+          class="cart-summary"
+          id="cartSummary"
+          hidden
+        >
           <div class="summary-row">
             <span>Subtotal</span>
-            <strong id="cartSubtotal">0 IQD</strong>
+            <strong id="cartSubtotal">
+              0 IQD
+            </strong>
           </div>
 
           <p class="cart-note">
-            Checkout will be connected later with Odoo.
+            Checkout will be connected with Odoo in the next phase.
           </p>
 
           <button
@@ -285,13 +327,14 @@
             Checkout coming soon
           </button>
         </div>
+
       </div>
     </aside>
 
-    <!-- =======================================================
-         PRODUCT / MEAL DETAILS MODAL
-         ======================================================= -->
-    <dialog class="meal-modal" id="mealModal">
+    <dialog
+      class="meal-modal"
+      id="mealModal"
+    >
       <div class="meal-modal-content">
 
         <button
@@ -312,8 +355,14 @@
         </div>
 
         <div class="meal-modal-body">
-          <p class="section-kicker" id="mealModalCategory"></p>
+
+          <p
+            class="section-kicker"
+            id="mealModalCategory"
+          ></p>
+
           <h2 id="mealModalName"></h2>
+
           <p id="mealModalDescription"></p>
 
           <div
@@ -321,11 +370,14 @@
             id="mealModalNutrition"
             aria-label="Nutrition information"
           >
-            <!-- Calories / protein / carbs / fat inserted from data.js -->
           </div>
 
           <div class="meal-modal-footer">
-            <strong class="meal-modal-price" id="mealModalPrice"></strong>
+
+            <strong
+              class="meal-modal-price"
+              id="mealModalPrice"
+            ></strong>
 
             <button
               class="primary-button"
@@ -334,27 +386,26 @@
             >
               Add to cart
             </button>
+
           </div>
+
         </div>
 
       </div>
     </dialog>
 
-    <!-- =======================================================
-         FOOTER
-         ======================================================= -->
     <footer class="site-footer">
       <div class="container footer-inner">
 
         <div class="footer-brand">
           <img
-            src="assets/images/logo/lean-bite-logo.svg"
+            src="assets/images/logo/lean-bite-logo-white.jpg"
             alt="Lean Bite"
             class="footer-logo"
           />
 
           <p>
-            Everyday nutrition, easy decisions, flavor first.
+            Real food. Brighter days.
           </p>
         </div>
 
@@ -368,12 +419,6 @@
 
   </div>
 
-  <!-- =========================================================
-       JAVASCRIPT
-       Order matters:
-       1) data.js provides menu data
-       2) app.js renders and controls the UI
-       ========================================================= -->
   <script src="data.js"></script>
   <script src="app.js"></script>
 </body>
