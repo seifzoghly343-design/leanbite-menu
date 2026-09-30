@@ -1590,4 +1590,332 @@ dialog:focus-visible {
     width: 125px;
     height: 50px;
   }
+}/* =========================================================
+   LEAN BITE — CHECKOUT UI
+   Add this block at the VERY END of styles.css
+   ========================================================= */
+
+.checkout-modal {
+  width: min(calc(100% - 24px), 1080px);
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  border: 0;
+  border-radius: 30px;
+  overflow: hidden;
+  background: var(--warm-milk);
+  color: var(--deep-cocoa);
+  box-shadow: var(--shadow-lg);
+}
+
+.checkout-modal::backdrop {
+  background: rgba(23, 19, 18, 0.56);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.checkout-shell {
+  max-height: inherit;
+  overflow: auto;
+}
+
+.checkout-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 24px 26px 20px;
+  background: rgba(255, 248, 242, 0.96);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.checkout-header h2 {
+  margin: 0;
+  font-size: clamp(30px, 4vw, 42px);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.checkout-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  gap: 24px;
+  padding: 26px;
+}
+
+.checkout-form-wrap,
+.checkout-order-summary {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.checkout-form-wrap {
+  padding: 24px;
+}
+
+.checkout-order-summary {
+  align-self: start;
+  position: sticky;
+  top: 110px;
+  padding: 22px;
+}
+
+.checkout-section-heading {
+  margin-bottom: 20px;
+}
+
+.checkout-section-heading h3 {
+  margin-bottom: 7px;
+  font-size: 24px;
+  line-height: 1.05;
+}
+
+.checkout-section-heading p {
+  margin-bottom: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.checkout-form {
+  width: 100%;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.form-field-full {
+  grid-column: 1 / -1;
+}
+
+.form-field label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--deep-cocoa);
+}
+
+.optional-label {
+  margin-left: 5px;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.form-field input,
+.form-field textarea {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: 15px;
+  background: var(--warm-milk);
+  color: var(--deep-cocoa);
+  padding: 13px 14px;
+  outline: none;
+  transition:
+    border-color var(--ease),
+    box-shadow var(--ease),
+    background-color var(--ease);
+}
+
+.form-field textarea {
+  resize: vertical;
+  min-height: 96px;
+}
+
+.form-field input::placeholder,
+.form-field textarea::placeholder {
+  color: var(--text-soft);
+}
+
+.form-field input:focus,
+.form-field textarea:focus {
+  border-color: var(--leanbite-coral);
+  background: var(--white);
+  box-shadow: 0 0 0 4px rgba(236, 77, 41, 0.08);
+}
+
+.form-field.has-error input,
+.form-field.has-error textarea {
+  border-color: #C93A2A;
+  box-shadow: 0 0 0 4px rgba(201, 58, 42, 0.08);
+}
+
+.field-error {
+  min-height: 16px;
+  color: #B52E22;
+  font-size: 12px;
+}
+
+.checkout-submit {
+  margin-top: 20px;
+}
+
+.checkout-dev-note {
+  margin: 10px 0 0;
+  color: var(--text-soft);
+  font-size: 11px;
+  text-align: center;
+}
+
+.checkout-message {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+}
+
+.checkout-message.is-success {
+  background: var(--surface-lime);
+  color: var(--deep-cocoa);
+  border: 1px solid rgba(190, 211, 59, 0.45);
+}
+
+.checkout-message.is-error {
+  background: #FFF0ED;
+  color: #9E2B20;
+  border: 1px solid rgba(201, 58, 42, 0.2);
+}
+
+.checkout-summary-items {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.checkout-summary-item {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.checkout-summary-image {
+  width: 58px;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  object-fit: cover;
+  background: var(--surface-peach);
+}
+
+.checkout-summary-name {
+  margin: 0 0 3px;
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.checkout-summary-meta {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.checkout-summary-price {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.checkout-summary-totals {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-strong);
+}
+
+.checkout-total-row {
+  margin-top: 10px;
+  padding-top: 13px;
+  border-top: 1px solid var(--border);
+  font-size: 18px;
+}
+
+.checkout-total-row strong {
+  color: var(--leanbite-coral);
+}
+
+#checkoutOpen {
+  margin-top: 8px;
+}
+
+#checkoutOpen:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+  .checkout-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .checkout-order-summary {
+    position: static;
+    order: -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .checkout-modal {
+    width: calc(100% - 10px);
+    max-height: calc(100vh - 10px);
+    border-radius: 22px;
+  }
+
+  .checkout-header {
+    padding: 18px 16px 15px;
+  }
+
+  .checkout-layout {
+    gap: 14px;
+    padding: 14px;
+  }
+
+  .checkout-form-wrap,
+  .checkout-order-summary {
+    border-radius: 19px;
+    padding: 17px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 13px;
+  }
+
+  .form-field-full {
+    grid-column: auto;
+  }
+
+  .checkout-summary-items {
+    max-height: 280px;
+  }
+
+  .checkout-summary-item {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .checkout-summary-image {
+    width: 52px;
+  }
+
+  .checkout-summary-price {
+    grid-column: 2;
+    justify-self: start;
+  }
 }
