@@ -892,7 +892,82 @@
 
     saveCart();
   };
+const showCartToast = (meal) => {
+  if (!meal) {
+    return;
+  }
 
+  let toast =
+    document.getElementById(
+      "cartToast"
+    );
+
+  if (!toast) {
+    toast =
+      document.createElement(
+        "div"
+      );
+
+    toast.id =
+      "cartToast";
+
+    toast.className =
+      "cart-toast";
+
+    toast.setAttribute(
+      "role",
+      "status"
+    );
+
+    toast.setAttribute(
+      "aria-live",
+      "polite"
+    );
+
+    document.body.appendChild(
+      toast
+    );
+  }
+
+  toast.innerHTML = `
+    <div class="cart-toast-icon">
+      ✓
+    </div>
+
+    <div class="cart-toast-content">
+
+      <p class="cart-toast-title">
+        Added to cart
+      </p>
+
+      <p class="cart-toast-meal">
+        ${escapeHTML(meal.name)}
+      </p>
+
+    </div>
+  `;
+
+  clearTimeout(
+    window.leanBiteToastTimer
+  );
+
+  toast.classList.remove(
+    "is-showing"
+  );
+
+  void toast.offsetWidth;
+
+  toast.classList.add(
+    "is-showing"
+  );
+
+  window.leanBiteToastTimer =
+    setTimeout(() => {
+      toast.classList.remove(
+        "is-showing"
+      );
+    }, 2000);
+};
   const addToCart = (
     mealId
   ) => {
@@ -919,9 +994,13 @@
     }
 
     saveCart();
-    renderCart();
+renderCart();
 
-    el.cartCount?.animate?.(
+showCartToast(
+  getMealById(mealId)
+);
+
+el.cartCount?.animate?.(
       [
         {
           transform:
