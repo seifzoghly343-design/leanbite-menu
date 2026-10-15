@@ -739,30 +739,37 @@
     saveCart();
   }
 
-  function addToCart(mealId) {
-    var meal = getMealById(mealId);
+ 
+function addToCart(mealId) {
+  var meal = getMealById(mealId);
 
-    if (!meal) {
-      return;
-    }
-
-    var existing = state.cart.find(function (item) {
-      return item.id === mealId;
-    });
-
-    if (existing) {
-      existing.qty += 1;
-    } else {
-      state.cart.push({
-        id: mealId,
-        qty: 1
-      });
-    }
-
-    saveCart();
-    renderCart();
-    animateCartCount();
+  if (!meal) {
+    return;
   }
+
+  var existing = state.cart.find(function (item) {
+    return item.id === mealId;
+  });
+
+  if (existing) {
+    existing.qty += 1;
+  } else {
+    state.cart.push({
+      id: mealId,
+      qty: 1
+    });
+  }
+
+  saveCart();
+  renderCart();
+  animateCartCount();
+
+  showCartToast(meal.name + " — Added to cart");
+
+  if (typeof navigator.vibrate === "function") {
+    navigator.vibrate(60);
+  }
+}
 
   function changeCartQuantity(mealId, difference) {
     var item = state.cart.find(function (cartItem) {
@@ -951,6 +958,43 @@
       }
     );
   }
+function showCartToast(message) {
+  var toast = document.getElementById("leanBiteToast");
+
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "leanBiteToast";
+
+    toast.style.cssText =
+      "position:fixed;" +
+      "left:50%;" +
+      "bottom:24px;" +
+      "transform:translateX(-50%);" +
+      "z-index:99999;" +
+      "max-width:calc(100% - 32px);" +
+      "padding:12px 20px;" +
+      "border-radius:999px;" +
+      "background:#332824;" +
+      "color:#FFFFFF;" +
+      "font:500 14px Fredoka, sans-serif;" +
+      "text-align:center;" +
+      "box-shadow:0 8px 24px rgba(51,40,36,.2);";
+
+    document.body.appendChild(toast);
+  }
+
+  toast.textContent = message;
+  toast.hidden = false;
+
+  if (toast.hideTimer) {
+    window.clearTimeout(toast.hideTimer);
+  }
+
+  toast.hideTimer = window.setTimeout(function () {
+    toast.hidden = true;
+  }, 2200);
+}
+
 
   /* =========================================================
      14) SEARCH
@@ -1006,7 +1050,64 @@
     }
 
     renderMenu();
-  }  /* =========================================================
+    }
+function setupWhatsAppCheckout() {
+  if (!els.cartSummary) {
+    return;
+  }
+
+  var button = els.cartSummary.querySelector(".primary-button");
+
+  if (!button || button.dataset.whatsappBound === "true") {
+    return;
+  }
+
+  button.dataset.whatsappBound = "true";
+  button.disabled = false;
+  button.removeAttribute("aria-disabled");
+  button.textContent = "Order via WhatsApp";
+
+  button.addEventListener("click", function () {
+    if (!state.cart.length) {
+      showCartToast("Your cart is empty");
+      return;
+    }
+
+    if (cartHasUnpricedItems()) {
+      showCartToast("Please confirm pending prices with the restaurant");
+      return;
+    }
+
+    var orderLines = state.cart.map(function (item) {
+      var meal = getMealById(item.id);
+      var itemName = meal.name;
+
+      if (meal.nameAr) {
+        itemName += " / " + meal.nameAr;
+      }
+
+      return (
+        "- " + itemName +
+        " x " + item.qty +
+        " | " + formatPrice(Number(meal.price) * item.qty)
+      );
+    });
+
+    var message =
+      "Hello Lean Bite! I'd like to place an order.\n\n" +
+      orderLines.join("\n") +
+      "\n\nSubtotal: " + formatPrice(getCartSubtotal()) +
+      "\n\nPlease confirm my order.";
+
+    var whatsappUrl =
+      "https://wa.me/9647801087087?text=" +
+      encodeURIComponent(message);
+
+    window.open(whatsappUrl, "_blank");
+  });
+}
+
+  /* =========================================================
      15) EVENT LISTENERS
      ========================================================= */
 
@@ -1165,7 +1266,9 @@
      16) INITIAL APP RENDER
      ========================================================= */
   function init() {
-    renderCategories();
+  setupWhatsAppCheckout();
+
+  renderCategories();
     renderOffers();
     renderMenu();
     renderCart();
