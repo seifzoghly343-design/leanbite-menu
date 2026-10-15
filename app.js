@@ -558,8 +558,45 @@
     }
 
     var meals = getFilteredMeals();
+    var showCategoryGroups = state.activeCategory === "all";
 
-    els.menuGrid.innerHTML = meals.map(mealCardHTML).join("");
+    if (showCategoryGroups) {
+      var categories = getCategories();
+      var groups = categories.map(function (category) {
+        var categoryMeals = meals.filter(function (meal) {
+          return meal.category === category.id;
+        });
+
+        if (!categoryMeals.length) {
+          return "";
+        }
+
+        return (
+          '<section class="menu-category-group" aria-labelledby="menu-group-' +
+          escapeHTML(category.id) +
+          '">' +
+          '<div class="menu-category-heading">' +
+          '<h3 id="menu-group-' + escapeHTML(category.id) + '">' +
+          escapeHTML(category.name) +
+          '</h3>' +
+          '<span class="menu-category-count">' +
+          escapeHTML(categoryMeals.length) +
+          (categoryMeals.length === 1 ? ' item' : ' items') +
+          '</span>' +
+          '</div>' +
+          '<div class="menu-category-grid">' +
+          categoryMeals.map(mealCardHTML).join("") +
+          '</div>' +
+          '</section>'
+        );
+      });
+
+      els.menuGrid.classList.add("menu-grid--grouped");
+      els.menuGrid.innerHTML = groups.join("");
+    } else {
+      els.menuGrid.classList.remove("menu-grid--grouped");
+      els.menuGrid.innerHTML = meals.map(mealCardHTML).join("");
+    }
 
     attachImageFallbacks(els.menuGrid);
 
