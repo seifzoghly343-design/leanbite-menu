@@ -1765,3 +1765,24 @@ dialog:focus-visible {
   }
 }
 
+/* Mobile: Stack meal cards vertically */
+@media screen and (max-width: 600px) {
+  .menu-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: 100%;
+    gap: 16px;
+  }
+
+  .menu-grid > * {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .menu-grid img {
+    max-width: 100%;
+  }
+}
+
+
