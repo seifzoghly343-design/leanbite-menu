@@ -1,991 +1,720 @@
-/* Lean Bite Menu - app.js
-   Front-end only. Odoo submission will be connected later. */
+/* =========================================================
+   LEAN BITE MENU — app.js
+   Updated for the current data.js structure.
 
-(() => {
+   Handles:
+   - Categories
+   - Offers
+   - Search
+   - Menu rendering
+   - Missing images / missing prices
+   - Meal details modal
+   - Cart
+   - Local cart persistence
+
+   Odoo checkout is NOT connected yet.
+   ========================================================= */
+
+(function () {
   "use strict";
 
+  /* =========================================================
+     1) SAFETY CHECK
+     ========================================================= */
   if (!window.LEAN_BITE_DATA) {
-    console.error("data.js must load before app.js");
+    console.error(
+      "Lean Bite data was not found. Make sure data.js is loaded before app.js."
+    );
     return;
   }
 
-  const DATA = window.LEAN_BITE_DATA;
-  const $ = (id) => document.getElementById(id);
-
-  const getMeals =
-    window.getAvailableLeanBiteMeals ||
-    (() => DATA.meals || []);
-
-  const getOffers =
-    window.getActiveLeanBiteOffers ||
-    (() => DATA.offers || []);
-
-  const getCategories =
-    window.getLeanBiteCategories ||
-    (() => DATA.categories || []);
-
-  const getMealById =
-    window.getLeanBiteMealById ||
-    ((id) =>
-      (DATA.meals || []).find((meal) => meal.id === id) || null);
-
-  const formatPrice =
-    window.formatLeanBitePrice ||
-    ((price) =>
-      price === null ||
-      price === undefined ||
-      price === ""
-        ? ""
-        : `${Number(price).toLocaleString()} IQD`);
-
-  const el = {
-    searchToggle: $("searchToggle"),
-    searchPanel: $("searchPanel"),
-    menuSearch: $("menuSearch"),
-    searchClear: $("searchClear"),
-
-    offersSection: document.querySelector(".offers-section"),
-    offersTrack: $("offersTrack"),
-    viewAllOffers: $("viewAllOffers"),
-
-    categoryNavInner:
-      document.querySelector(".category-nav-inner"),
-
-    activeCategoryLabel: $("activeCategoryLabel"),
-    menuTitle: $("menuTitle"),
-    resultsCount: $("resultsCount"),
-    menuGrid: $("menuGrid"),
-    emptyState: $("emptyState"),
-
-    cartToggle: $("cartToggle"),
-    cartDrawer: $("cartDrawer"),
-    cartBackdrop: $("cartBackdrop"),
-    cartClose: $("cartClose"),
-    cartItems: $("cartItems"),
-    cartEmpty: $("cartEmpty"),
-    cartSummary: $("cartSummary"),
-    cartSubtotal: $("cartSubtotal"),
-    cartCount: $("cartCount"),
-    checkoutOpen: $("checkoutOpen"),
-
-    checkoutModal: $("checkoutModal"),
-    checkoutClose: $("checkoutClose"),
-    checkoutForm: $("checkoutForm"),
-
-    customerName: $("customerName"),
-    customerPhone: $("customerPhone"),
-    customerArea: $("customerArea"),
-    customerAddress: $("customerAddress"),
-    orderNotes: $("orderNotes"),
-
-    checkoutMessage: $("checkoutMessage"),
-    checkoutSummaryItems: $("checkoutSummaryItems"),
-    checkoutItemCount: $("checkoutItemCount"),
-    checkoutTotal: $("checkoutTotal"),
-
-    mealModal: $("mealModal"),
-    mealModalClose: $("mealModalClose"),
-    mealModalImage: $("mealModalImage"),
-    mealModalCategory: $("mealModalCategory"),
-    mealModalName: $("mealModalName"),
-    mealModalDescription: $("mealModalDescription"),
-    mealModalNutrition: $("mealModalNutrition"),
-    mealModalPrice: $("mealModalPrice"),
-    mealModalAdd: $("mealModalAdd"),
-
-    copyrightYear: $("copyrightYear")
-  };
-
-  const PLACEHOLDER_IMAGE =
-    "data:image/svg+xml;charset=UTF-8," +
-    encodeURIComponent(`
-      <svg xmlns="http://www.w3.org/2000/svg"
-        width="900"
-        height="700"
-        viewBox="0 0 900 700">
-
-        <rect
-          width="900"
-          height="700"
-          fill="#FFF8F2"
-        />
-
-        <circle
-          cx="760"
-          cy="100"
-          r="72"
-          fill="#BED33B"
-        />
-
-        <path
-          d="M0 520 C150 430 220 610 390 520 C520 450 615 555 900 420 L900 700 L0 700 Z"
-          fill="#F7B7A6"
-        />
-
-        <text
-          x="450"
-          y="320"
-          text-anchor="middle"
-          font-family="Arial,sans-serif"
-          font-size="72"
-          font-weight="700"
-          fill="#EC4D29"
-        >
-          Lean Bite
-        </text>
-
-        <text
-          x="450"
-          y="385"
-          text-anchor="middle"
-          font-family="Arial,sans-serif"
-          font-size="28"
-          fill="#332824"
-        >
-          Image coming soon
-        </text>
-      </svg>
-    `);
-
   /* =========================================================
-     CART STORAGE
+     2) DATA SHORTCUTS
      ========================================================= */
+  var DATA = window.LEAN_BITE_DATA;
 
-  const loadCart = () => {
-    try {
-      const raw = JSON.parse(
-        localStorage.getItem("leanBiteCart") || "[]"
-      );
+  var getMeals =
+    window.getAvailableLeanBiteMeals ||
+    function () {
+      return (DATA.meals || []).filter(function (meal) {
+        return meal.available !== false;
+      });
+    };
 
-      if (!Array.isArray(raw)) {
-        return [];
+  var getOffers =
+    window.getActiveLeanBiteOffers ||
+    function () {
+      return (DATA.offers || []).filter(function (offer) {
+        return offer.active !== false;
+      });
+    };
+
+  var getCategories =
+    window.getLeanBiteCategories ||
+    function () {
+      return DATA.categories || [];
+    };
+
+  var getMealById =
+    window.getLeanBiteMealById ||
+    function (id) {
+      return (DATA.meals || []).find(function (meal) {
+        return meal.id === id;
+      }) || null;
+    };
+
+  var formatPrice =
+    window.formatLeanBitePrice ||
+    function (price) {
+      if (price === null || price === undefined || price === "") {
+        return "";
       }
 
-      return raw
-        .filter(
-          (item) =>
-            item?.id &&
-            Number(item.qty) > 0
-        )
-        .map((item) => ({
-          id: String(item.id),
-          qty: Math.max(
-            1,
-            Number(item.qty) || 1
-          )
-        }));
-    } catch {
-      return [];
-    }
+      return Number(price || 0).toLocaleString() + " IQD";
+    };
+
+  /* =========================================================
+     3) DOM REFERENCES
+     ========================================================= */
+  var els = {
+    searchToggle: document.getElementById("searchToggle"),
+    searchPanel: document.getElementById("searchPanel"),
+    menuSearch: document.getElementById("menuSearch"),
+    searchClear: document.getElementById("searchClear"),
+
+    offersSection: document.querySelector(".offers-section"),
+    offersTrack: document.getElementById("offersTrack"),
+    viewAllOffers: document.getElementById("viewAllOffers"),
+
+    categoryNav: document.getElementById("categoryNav"),
+    categoryNavInner: document.querySelector(".category-nav-inner"),
+
+    activeCategoryLabel: document.getElementById("activeCategoryLabel"),
+    menuTitle: document.getElementById("menuTitle"),
+    resultsCount: document.getElementById("resultsCount"),
+    menuGrid: document.getElementById("menuGrid"),
+    emptyState: document.getElementById("emptyState"),
+
+    cartToggle: document.getElementById("cartToggle"),
+    cartDrawer: document.getElementById("cartDrawer"),
+    cartBackdrop: document.getElementById("cartBackdrop"),
+    cartClose: document.getElementById("cartClose"),
+    cartItems: document.getElementById("cartItems"),
+    cartEmpty: document.getElementById("cartEmpty"),
+    cartSummary: document.getElementById("cartSummary"),
+    cartSubtotal: document.getElementById("cartSubtotal"),
+    cartCount: document.getElementById("cartCount"),
+
+    mealModal: document.getElementById("mealModal"),
+    mealModalClose: document.getElementById("mealModalClose"),
+    mealModalImage: document.getElementById("mealModalImage"),
+    mealModalCategory: document.getElementById("mealModalCategory"),
+    mealModalName: document.getElementById("mealModalName"),
+    mealModalDescription: document.getElementById("mealModalDescription"),
+    mealModalNutrition: document.getElementById("mealModalNutrition"),
+    mealModalPrice: document.getElementById("mealModalPrice"),
+    mealModalAdd: document.getElementById("mealModalAdd"),
+
+    copyrightYear: document.getElementById("copyrightYear")
   };
 
-  const state = {
+  /* =========================================================
+     4) APP STATE
+     ========================================================= */
+  var state = {
     activeCategory: "all",
     searchTerm: "",
     selectedMealId: null,
     cart: loadCart()
   };
 
-  const saveCart = () => {
-    try {
-      localStorage.setItem(
-        "leanBiteCart",
-        JSON.stringify(state.cart)
-      );
-    } catch (error) {
-      console.warn(
-        "Cart could not be saved.",
-        error
-      );
-    }
-  };
+  /* =========================================================
+     5) BRAND PLACEHOLDER IMAGE
+     ========================================================= */
+  var PLACEHOLDER_IMAGE =
+    "data:image/svg+xml;charset=UTF-8," +
+    encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="900" height="700" viewBox="0 0 900 700">' +
+        '<rect width="900" height="700" fill="#FFF8F2"/>' +
+        '<circle cx="760" cy="100" r="72" fill="#BED33B"/>' +
+        '<path d="M0 520 C150 430 220 610 390 520 C520 450 615 555 900 420 L900 700 L0 700 Z" fill="#F7B7A6"/>' +
+        '<text x="450" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" font-weight="700" fill="#EC4D29">Lean Bite</text>' +
+        '<text x="450" y="385" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#332824">Image coming soon</text>' +
+      "</svg>"
+    );
 
   /* =========================================================
-     HELPERS
+     6) LOCAL STORAGE
      ========================================================= */
+  function loadCart() {
+    try {
+      var saved = localStorage.getItem("leanBiteCart");
 
-  const escapeHTML = (value) =>
-    String(value ?? "")
+      if (!saved) {
+        return [];
+      }
+
+      var parsed = JSON.parse(saved);
+
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed
+        .filter(function (item) {
+          return item && item.id && Number(item.qty) > 0;
+        })
+        .map(function (item) {
+          return {
+            id: String(item.id),
+            qty: Math.max(1, Number(item.qty) || 1)
+          };
+        });
+    } catch (error) {
+      console.warn("Could not load Lean Bite cart:", error);
+      return [];
+    }
+  }
+
+  function saveCart() {
+    try {
+      localStorage.setItem("leanBiteCart", JSON.stringify(state.cart));
+    } catch (error) {
+      console.warn("Could not save Lean Bite cart:", error);
+    }
+  }
+
+  /* =========================================================
+     7) GENERAL HELPERS
+     ========================================================= */
+  function escapeHTML(value) {
+    return String(value == null ? "" : value)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  }
 
-  const hasValue = (value) =>
-    value !== null &&
-    value !== undefined &&
-    value !== "";
+  function hasValue(value) {
+    return value !== null && value !== undefined && value !== "";
+  }
 
-  const hasPrice = (meal) =>
-    meal &&
-    hasValue(meal.price) &&
-    !Number.isNaN(Number(meal.price));
+  function hasPrice(meal) {
+    return meal && hasValue(meal.price) && !Number.isNaN(Number(meal.price));
+  }
 
-  const mealImage = (meal) =>
-    meal?.image || PLACEHOLDER_IMAGE;
+  function getMealImage(meal) {
+    if (!meal || !meal.image) {
+      return PLACEHOLDER_IMAGE;
+    }
 
-  const isOpen = (dialog) =>
-    Boolean(
-      dialog?.hasAttribute("open")
-    );
+    return meal.image;
+  }
 
-  const categoryName = (id) => {
-    if (id === "all") {
+  function getCategoryName(categoryId) {
+    if (categoryId === "all") {
       return "All";
     }
 
-    return (
-      getCategories().find(
-        (category) =>
-          category.id === id
-      )?.name || "Menu"
-    );
-  };
+    var category = getCategories().find(function (item) {
+      return item.id === categoryId;
+    });
 
-  const macroValue = (value) => {
+    return category ? category.name : "Menu";
+  }
+
+  function normaliseText(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase();
+  }
+
+  function pluraliseItems(count) {
+    return count === 1 ? "1 item" : count + " items";
+  }
+
+  function formatMacroNumber(value) {
     if (!hasValue(value)) {
       return "";
     }
 
-    const number = Number(value);
+    var number = Number(value);
 
     if (Number.isNaN(number)) {
-      return value;
+      return escapeHTML(value);
     }
 
-    return Number.isInteger(number)
-      ? String(number)
-      : String(
-          Math.round(number * 10) / 10
-        );
-  };
+    if (Number.isInteger(number)) {
+      return String(number);
+    }
 
-  const nutritionChip = (
-    label,
-    value,
-    suffix = ""
-  ) =>
-    hasValue(value)
-      ? `
-        <span class="nutrition-chip">
-          ${escapeHTML(label)}:
-          ${escapeHTML(macroValue(value))}
-          ${escapeHTML(suffix)}
-        </span>
-      `
-      : "";
+    return String(Math.round(number * 10) / 10);
+  }
 
-  const priceHTML = (
-    meal,
-    className = "meal-price"
-  ) =>
-    hasPrice(meal)
-      ? `
-        <strong class="${className}">
-          ${escapeHTML(
-            formatPrice(meal.price)
-          )}
-        </strong>
-      `
-      : `
-        <span
-          class="${className} meal-price-pending"
-        >
-          Price coming soon
-        </span>
-      `;
+  function createNutritionChip(label, value, suffix) {
+    if (!hasValue(value)) {
+      return "";
+    }
 
-  const applyImageFallbacks = (
-    scope = document
-  ) => {
-    scope
-      .querySelectorAll(
-        "img[data-leanbite-image]"
-      )
-      .forEach((img) => {
-        img.addEventListener(
-          "error",
-          () => {
-            if (
-              img.dataset
-                .placeholderApplied ===
-              "true"
-            ) {
-              return;
-            }
+    return (
+      '<span class="nutrition-chip">' +
+      escapeHTML(label) +
+      ": " +
+      escapeHTML(formatMacroNumber(value)) +
+      escapeHTML(suffix || "") +
+      "</span>"
+    );
+  }
 
-            img.dataset.placeholderApplied =
-              "true";
+  function createPriceHTML(meal, className) {
+    className = className || "meal-price";
 
-            img.src =
-              PLACEHOLDER_IMAGE;
-          },
-          {
-            once: true
-          }
-        );
-      });
-  };
-
-  const updateBodyLock = () => {
-    const cartOpen =
-      el.cartDrawer?.classList.contains(
-        "is-open"
+    if (!hasPrice(meal)) {
+      return (
+        '<span class="' +
+        escapeHTML(className) +
+        ' meal-price-pending">Price coming soon</span>'
       );
+    }
 
-    document.body.style.overflow =
-      cartOpen ||
-      isOpen(el.mealModal) ||
-      isOpen(el.checkoutModal)
-        ? "hidden"
-        : "";
-  };
+    return (
+      '<strong class="' +
+      escapeHTML(className) +
+      '">' +
+      escapeHTML(formatPrice(meal.price)) +
+      "</strong>"
+    );
+  }
 
-  /* =========================================================
-     CATEGORIES
-     ========================================================= */
+  function createArabicNameHTML(meal, className) {
+    if (!meal || !hasValue(meal.nameAr)) {
+      return "";
+    }
 
-  const renderCategories = () => {
-    if (!el.categoryNavInner) {
+    return (
+      '<p class="' +
+      escapeHTML(className) +
+      '" lang="ar" dir="rtl">' +
+      escapeHTML(meal.nameAr) +
+      "</p>"
+    );
+  }
+
+  function handleImageError(img) {
+    if (!img || img.dataset.placeholderApplied === "true") {
       return;
     }
 
-    const categories = [
-      {
-        id: "all",
-        name: "All"
-      },
-      ...getCategories()
-    ];
+    img.dataset.placeholderApplied = "true";
+    img.src = PLACEHOLDER_IMAGE;
+  }
 
-    el.categoryNavInner.innerHTML =
-      categories
-        .map(
-          (category) => `
-            <button
-              class="category-pill ${
-                state.activeCategory ===
-                category.id
-                  ? "is-active"
-                  : ""
-              }"
-              type="button"
-              data-category="${escapeHTML(
-                category.id
-              )}"
-              aria-pressed="${
-                state.activeCategory ===
-                category.id
-                  ? "true"
-                  : "false"
-              }"
-            >
-              ${escapeHTML(
-                category.name
-              )}
-            </button>
-          `
-        )
-        .join("");
-  };
+  function attachImageFallbacks(scope) {
+    var root = scope || document;
 
-  const setActiveCategory = (
-    categoryId
-  ) => {
-    state.activeCategory =
-      categoryId || "all";
+    root
+      .querySelectorAll("img[data-leanbite-image]")
+      .forEach(function (img) {
+        img.addEventListener(
+          "error",
+          function () {
+            handleImageError(img);
+          },
+          { once: true }
+        );
+      });
+  }  /* =========================================================
+     8) CATEGORIES
+     ========================================================= */
+  function renderCategories() {
+    if (!els.categoryNavInner) {
+      return;
+    }
+
+    els.categoryNavInner.innerHTML = "";
+
+    var allButton = document.createElement("button");
+    allButton.className =
+      "category-pill" +
+      (state.activeCategory === "all" ? " is-active" : "");
+    allButton.type = "button";
+    allButton.dataset.category = "all";
+    allButton.setAttribute(
+      "aria-pressed",
+      state.activeCategory === "all" ? "true" : "false"
+    );
+    allButton.textContent = "All";
+    els.categoryNavInner.appendChild(allButton);
+
+    getCategories().forEach(function (category) {
+      var button = document.createElement("button");
+
+      button.className =
+        "category-pill" +
+        (state.activeCategory === category.id ? " is-active" : "");
+
+      button.type = "button";
+      button.dataset.category = category.id;
+      button.setAttribute(
+        "aria-pressed",
+        state.activeCategory === category.id ? "true" : "false"
+      );
+      button.textContent = category.name;
+
+      els.categoryNavInner.appendChild(button);
+    });
+  }
+
+  function setActiveCategory(categoryId) {
+    state.activeCategory = categoryId || "all";
 
     renderCategories();
     renderMenu();
 
-    const active = [
-      ...(
-        el.categoryNavInner?.querySelectorAll(
-          "[data-category]"
-        ) || []
-      )
-    ].find(
-      (button) =>
-        button.dataset.category ===
-        state.activeCategory
-    );
-
-    active?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "center"
-    });
-  };
-
-  /* =========================================================
-     OFFERS
-     ========================================================= */
-
-  const renderOffers = () => {
-    if (
-      !el.offersTrack ||
-      !el.offersSection
-    ) {
+    if (!els.categoryNavInner) {
       return;
     }
 
-    const offers = getOffers();
+    var buttons = els.categoryNavInner.querySelectorAll("[data-category]");
+    var activeButton = null;
 
-    el.offersSection.hidden =
-      offers.length === 0;
+    buttons.forEach(function (button) {
+      if (button.dataset.category === state.activeCategory) {
+        activeButton = button;
+      }
+    });
+
+    if (activeButton) {
+      activeButton.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center"
+      });
+    }
+  }
+
+  /* =========================================================
+     9) OFFERS
+     ========================================================= */
+  function renderOffers() {
+    if (!els.offersTrack || !els.offersSection) {
+      return;
+    }
+
+    var offers = getOffers();
 
     if (!offers.length) {
+      els.offersSection.hidden = true;
       return;
     }
 
-    el.offersTrack.innerHTML = offers
-      .map(
-        (offer) => `
-          <article class="offer-card">
+    els.offersSection.hidden = false;
 
-            <img
-              class="offer-card-image"
-              data-leanbite-image
-              src="${escapeHTML(
-                offer.image ||
-                  PLACEHOLDER_IMAGE
-              )}"
-              alt="${escapeHTML(
-                offer.title ||
-                  "Lean Bite offer"
-              )}"
-              loading="lazy"
-            />
+    els.offersTrack.innerHTML = offers
+      .map(function (offer) {
+        var image = offer.image || PLACEHOLDER_IMAGE;
 
-            <div
-              class="offer-card-overlay"
-            >
-              <h3
-                class="offer-card-title"
-              >
-                ${escapeHTML(
-                  offer.title ||
-                    "Lean Bite Offer"
-                )}
-              </h3>
-
-              <p
-                class="offer-card-text"
-              >
-                ${escapeHTML(
-                  offer.description ||
-                    ""
-                )}
-              </p>
-            </div>
-
-          </article>
-        `
-      )
+        return (
+          '<article class="offer-card" data-offer-id="' +
+          escapeHTML(offer.id) +
+          '">' +
+          '<img class="offer-card-image" data-leanbite-image src="' +
+          escapeHTML(image) +
+          '" alt="' +
+          escapeHTML(offer.title || "Lean Bite offer") +
+          '" loading="lazy">' +
+          '<div class="offer-card-overlay">' +
+          '<h3 class="offer-card-title">' +
+          escapeHTML(offer.title || "Lean Bite Offer") +
+          "</h3>" +
+          '<p class="offer-card-text">' +
+          escapeHTML(offer.description || "") +
+          "</p>" +
+          "</div>" +
+          "</article>"
+        );
+      })
       .join("");
 
-    applyImageFallbacks(
-      el.offersTrack
-    );
-  };
+    attachImageFallbacks(els.offersTrack);
+  }
 
   /* =========================================================
-     MENU
+     10) MENU FILTERING
      ========================================================= */
+  function getFilteredMeals() {
+    var meals = getMeals();
+    var search = normaliseText(state.searchTerm);
 
-  const filteredMeals = () => {
-    const search =
-      state.searchTerm
-        .trim()
-        .toLowerCase();
+    return meals.filter(function (meal) {
+      var categoryMatches =
+        state.activeCategory === "all" ||
+        meal.category === state.activeCategory;
 
-    return getMeals().filter(
-      (meal) => {
-        if (
-          state.activeCategory !==
-            "all" &&
-          meal.category !==
-            state.activeCategory
-        ) {
-          return false;
-        }
+      if (!categoryMatches) {
+        return false;
+      }
 
-        if (!search) {
-          return true;
-        }
+      if (!search) {
+        return true;
+      }
 
-        return [
+      var searchBlob = normaliseText(
+        [
           meal.name,
+          meal.nameAr,
           meal.description,
           meal.category,
-          categoryName(
-            meal.category
-          ),
+          getCategoryName(meal.category),
           meal.badge
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(search);
-      }
-    );
-  };
+        ].join(" ")
+      );
 
-  const mealCardHTML = (meal) => {
-    const nutrition =
-      meal.nutrition || {};
+      return searchBlob.indexOf(search) !== -1;
+    });
+  }
 
-    const nutritionHTML = [
-      nutritionChip(
-        "Kcal",
-        nutrition.calories
-      ),
-      nutritionChip(
-        "Protein",
-        nutrition.protein,
-        "g"
-      ),
-      nutritionChip(
-        "Carbs",
-        nutrition.carbs,
-        "g"
-      ),
-      nutritionChip(
-        "Fat",
-        nutrition.fat,
-        "g"
-      )
+  /* =========================================================
+     11) MENU CARD RENDERING
+     ========================================================= */
+  function mealCardHTML(meal) {
+    var nutrition = meal.nutrition || {};
+
+    var nutritionHTML = [
+      createNutritionChip("Kcal", nutrition.calories, ""),
+      createNutritionChip("Protein", nutrition.protein, "g"),
+      createNutritionChip("Carbs", nutrition.carbs, "g"),
+      createNutritionChip("Fat", nutrition.fat, "g")
     ]
       .filter(Boolean)
       .join("");
 
-    return `
-      <article
-        class="meal-card"
-        data-meal-id="${escapeHTML(
-          meal.id
-        )}"
-        tabindex="0"
-        role="button"
-        aria-label="View ${escapeHTML(
-          meal.name
-        )}"
-      >
+    return (
+      '<article class="meal-card" data-meal-id="' +
+      escapeHTML(meal.id) +
+      '" tabindex="0" role="button" aria-label="View ' +
+      escapeHTML(meal.name) +
+      '">' +
 
-        <div
-          class="meal-card-media"
-        >
+      '<div class="meal-card-media">' +
+      '<img class="meal-card-image" data-leanbite-image src="' +
+      escapeHTML(getMealImage(meal)) +
+      '" alt="' +
+      escapeHTML(meal.name) +
+      '" loading="lazy">' +
 
-          <img
-            class="meal-card-image"
-            data-leanbite-image
-            src="${escapeHTML(
-              mealImage(meal)
-            )}"
-            alt="${escapeHTML(
-              meal.name
-            )}"
-            loading="lazy"
-          />
+      (meal.badge
+        ? '<span class="meal-badge">' +
+          escapeHTML(meal.badge) +
+          "</span>"
+        : "") +
 
-          ${
-            meal.badge
-              ? `
-                <span
-                  class="meal-badge"
-                >
-                  ${escapeHTML(
-                    meal.badge
-                  )}
-                </span>
-              `
-              : ""
-          }
+      "</div>" +
 
-        </div>
+      '<div class="meal-card-body">' +
 
-        <div
-          class="meal-card-body"
-        >
+      '<div>' +
+      '<p class="meal-card-category">' +
+      escapeHTML(getCategoryName(meal.category)) +
+      "</p>" +
 
-          <div>
-            <p
-              class="meal-card-category"
-            >
-              ${escapeHTML(
-                categoryName(
-                  meal.category
-                )
-              )}
-            </p>
+      '<h3 class="meal-card-title">' +
+      escapeHTML(meal.name) +
+      "</h3>" +
+      createArabicNameHTML(meal, "meal-card-title-ar") +
+      "</div>" +
 
-            <h3
-              class="meal-card-title"
-            >
-              ${escapeHTML(
-                meal.name
-              )}
-            </h3>
-          </div>
+      (meal.description
+        ? '<p class="meal-card-description">' +
+          escapeHTML(meal.description) +
+          "</p>"
+        : "") +
 
-          ${
-            meal.description
-              ? `
-                <p
-                  class="meal-card-description"
-                >
-                  ${escapeHTML(
-                    meal.description
-                  )}
-                </p>
-              `
-              : ""
-          }
+      (nutritionHTML
+        ? '<div class="meal-card-meta">' +
+          nutritionHTML +
+          "</div>"
+        : "") +
 
-          ${
-            nutritionHTML
-              ? `
-                <div
-                  class="meal-card-meta"
-                >
-                  ${nutritionHTML}
-                </div>
-              `
-              : ""
-          }
+      '<div class="meal-card-footer">' +
+      createPriceHTML(meal, "meal-price") +
 
-          <div
-            class="meal-card-footer"
-          >
+      '<button class="add-button" type="button" data-add-meal="' +
+      escapeHTML(meal.id) +
+      '" aria-label="Add ' +
+      escapeHTML(meal.name) +
+      ' to cart">+</button>' +
 
-            ${priceHTML(meal)}
+      "</div>" +
+      "</div>" +
+      "</article>"
+    );
+  }
 
-            <button
-              class="add-button"
-              type="button"
-              data-add-meal="${escapeHTML(
-                meal.id
-              )}"
-              aria-label="Add ${escapeHTML(
-                meal.name
-              )} to cart"
-            >
-              +
-            </button>
-
-          </div>
-
-        </div>
-
-      </article>
-    `;
-  };
-
-  const renderMenu = () => {
-    if (!el.menuGrid) {
+  function renderMenu() {
+    if (!els.menuGrid) {
       return;
     }
 
-    const meals =
-      filteredMeals();
+    var meals = getFilteredMeals();
 
-    el.menuGrid.innerHTML =
-      meals
-        .map(mealCardHTML)
+    els.menuGrid.innerHTML = meals.map(mealCardHTML).join("");
+
+    attachImageFallbacks(els.menuGrid);
+
+    if (els.resultsCount) {
+      els.resultsCount.textContent = pluraliseItems(meals.length);
+    }
+
+    if (els.activeCategoryLabel) {
+      els.activeCategoryLabel.textContent =
+        state.activeCategory === "all"
+          ? "Explore"
+          : getCategoryName(state.activeCategory);
+    }
+
+    if (els.menuTitle) {
+      els.menuTitle.textContent =
+        state.activeCategory === "all"
+          ? "Our Menu"
+          : getCategoryName(state.activeCategory);
+    }
+
+    if (els.emptyState) {
+      els.emptyState.hidden = meals.length !== 0;
+    }
+  }
+
+  /* =========================================================
+     12) MEAL DETAILS MODAL
+     ========================================================= */
+  function openMealModal(mealId) {
+    var meal = getMealById(mealId);
+
+    if (!meal || !els.mealModal) {
+      return;
+    }
+
+    state.selectedMealId = meal.id;
+
+    if (els.mealModalImage) {
+      els.mealModalImage.dataset.placeholderApplied = "false";
+      els.mealModalImage.src = getMealImage(meal);
+      els.mealModalImage.alt = meal.name || "Lean Bite meal";
+      els.mealModalImage.onerror = function () {
+        handleImageError(els.mealModalImage);
+      };
+    }
+
+    if (els.mealModalCategory) {
+      els.mealModalCategory.textContent =
+        getCategoryName(meal.category);
+    }
+
+    if (els.mealModalName) {
+      els.mealModalName.textContent = meal.name || "";
+
+      var modalNameAr = document.getElementById("mealModalNameAr");
+
+      if (!modalNameAr) {
+        modalNameAr = document.createElement("p");
+        modalNameAr.id = "mealModalNameAr";
+        modalNameAr.className = "meal-modal-name-ar";
+        modalNameAr.setAttribute("lang", "ar");
+        modalNameAr.setAttribute("dir", "rtl");
+        els.mealModalName.insertAdjacentElement("afterend", modalNameAr);
+      }
+
+      modalNameAr.textContent = meal.nameAr || "";
+      modalNameAr.hidden = !meal.nameAr;
+    }
+
+    if (els.mealModalDescription) {
+      if (meal.description) {
+        els.mealModalDescription.textContent = meal.description;
+        els.mealModalDescription.hidden = false;
+      } else {
+        els.mealModalDescription.textContent = "";
+        els.mealModalDescription.hidden = true;
+      }
+    }
+
+    if (els.mealModalPrice) {
+      if (hasPrice(meal)) {
+        els.mealModalPrice.textContent = formatPrice(meal.price);
+        els.mealModalPrice.classList.remove("meal-price-pending");
+      } else {
+        els.mealModalPrice.textContent = "Price coming soon";
+        els.mealModalPrice.classList.add("meal-price-pending");
+      }
+    }
+
+    if (els.mealModalNutrition) {
+      var nutrition = meal.nutrition || {};
+
+      var nutritionHTML = [
+        createNutritionChip("Calories", nutrition.calories, ""),
+        createNutritionChip("Protein", nutrition.protein, "g"),
+        createNutritionChip("Carbs", nutrition.carbs, "g"),
+        createNutritionChip("Fat", nutrition.fat, "g")
+      ]
+        .filter(Boolean)
         .join("");
 
-    applyImageFallbacks(
-      el.menuGrid
-    );
-
-    if (el.resultsCount) {
-      el.resultsCount.textContent =
-        meals.length === 1
-          ? "1 item"
-          : `${meals.length} items`;
+      els.mealModalNutrition.innerHTML = nutritionHTML;
+      els.mealModalNutrition.hidden = !nutritionHTML;
     }
 
-    if (
-      el.activeCategoryLabel
-    ) {
-      el.activeCategoryLabel.textContent =
-        state.activeCategory ===
-        "all"
-          ? "Explore"
-          : categoryName(
-              state.activeCategory
-            );
-    }
-
-    if (el.menuTitle) {
-      el.menuTitle.textContent =
-        state.activeCategory ===
-        "all"
-          ? "Our Menu"
-          : categoryName(
-              state.activeCategory
-            );
-    }
-
-    if (el.emptyState) {
-      el.emptyState.hidden =
-        meals.length > 0;
-    }
-  };
-
-  /* =========================================================
-     MEAL MODAL
-     ========================================================= */
-
-  const openMealModal = (
-    mealId
-  ) => {
-    const meal =
-      getMealById(mealId);
-
-    if (
-      !meal ||
-      !el.mealModal
-    ) {
-      return;
-    }
-
-    state.selectedMealId =
-      meal.id;
-
-    el.mealModalImage.src =
-      mealImage(meal);
-
-    el.mealModalImage.alt =
-      meal.name;
-
-    el.mealModalImage.onerror =
-      () => {
-        el.mealModalImage.onerror =
-          null;
-
-        el.mealModalImage.src =
-          PLACEHOLDER_IMAGE;
-      };
-
-    el.mealModalCategory.textContent =
-      categoryName(
-        meal.category
-      );
-
-    el.mealModalName.textContent =
-      meal.name || "";
-
-    if (meal.description) {
-      el.mealModalDescription.textContent =
-        meal.description;
-
-      el.mealModalDescription.hidden =
-        false;
+    if (typeof els.mealModal.showModal === "function") {
+      els.mealModal.showModal();
     } else {
-      el.mealModalDescription.textContent =
-        "";
-
-      el.mealModalDescription.hidden =
-        true;
+      els.mealModal.setAttribute("open", "");
     }
 
-    el.mealModalPrice.textContent =
-      hasPrice(meal)
-        ? formatPrice(
-            meal.price
-          )
-        : "Price coming soon";
+    document.body.style.overflow = "hidden";
+  }
 
-    el.mealModalPrice.classList.toggle(
-      "meal-price-pending",
-      !hasPrice(meal)
-    );
-
-    const nutrition =
-      meal.nutrition || {};
-
-    const nutritionHTML = [
-      nutritionChip(
-        "Calories",
-        nutrition.calories
-      ),
-      nutritionChip(
-        "Protein",
-        nutrition.protein,
-        "g"
-      ),
-      nutritionChip(
-        "Carbs",
-        nutrition.carbs,
-        "g"
-      ),
-      nutritionChip(
-        "Fat",
-        nutrition.fat,
-        "g"
-      )
-    ]
-      .filter(Boolean)
-      .join("");
-
-    el.mealModalNutrition.innerHTML =
-      nutritionHTML;
-
-    el.mealModalNutrition.hidden =
-      !nutritionHTML;
-
-    if (
-      typeof el.mealModal
-        .showModal ===
-      "function"
-    ) {
-      el.mealModal.showModal();
-    } else {
-      el.mealModal.setAttribute(
-        "open",
-        ""
-      );
-    }
-
-    updateBodyLock();
-  };
-
-  const closeMealModal = () => {
-    if (!el.mealModal) {
+  function closeMealModal() {
+    if (!els.mealModal) {
       return;
     }
 
     if (
-      typeof el.mealModal
-        .close ===
-        "function" &&
-      el.mealModal.open
+      typeof els.mealModal.close === "function" &&
+      els.mealModal.open
     ) {
-      el.mealModal.close();
+      els.mealModal.close();
     } else {
-      el.mealModal.removeAttribute(
-        "open"
-      );
+      els.mealModal.removeAttribute("open");
     }
 
-    state.selectedMealId =
-      null;
-
-    updateBodyLock();
-  };
-
-  /* =========================================================
-     CART
+    state.selectedMealId = null;
+    document.body.style.overflow = "";
+  }  /* =========================================================
+     13) CART LOGIC
      ========================================================= */
-
-  const cleanCart = () => {
-    state.cart =
-      state.cart.filter(
-        (item) =>
-          Boolean(
-            getMealById(
-              item.id
-            )
-          )
-      );
+  function cleanCart() {
+    state.cart = state.cart.filter(function (cartItem) {
+      return Boolean(getMealById(cartItem.id));
+    });
 
     saveCart();
-  };
-const showCartToast = (meal) => {
-  if (!meal) {
-    return;
   }
 
-  let toast =
-    document.getElementById(
-      "cartToast"
-    );
+  function addToCart(mealId) {
+    var meal = getMealById(mealId);
 
-  if (!toast) {
-    toast =
-      document.createElement(
-        "div"
-      );
-
-    toast.id =
-      "cartToast";
-
-    toast.className =
-      "cart-toast";
-
-    toast.setAttribute(
-      "role",
-      "status"
-    );
-
-    toast.setAttribute(
-      "aria-live",
-      "polite"
-    );
-
-    document.body.appendChild(
-      toast
-    );
-  }
-
-  toast.innerHTML = `
-    <div class="cart-toast-icon">
-      ✓
-    </div>
-
-    <div class="cart-toast-content">
-
-      <p class="cart-toast-title">
-        Added to cart
-      </p>
-
-      <p class="cart-toast-meal">
-        ${escapeHTML(meal.name)}
-      </p>
-
-    </div>
-  `;
-
-  clearTimeout(
-    window.leanBiteToastTimer
-  );
-
-  toast.classList.remove(
-    "is-showing"
-  );
-
-  void toast.offsetWidth;
-
-  toast.classList.add(
-    "is-showing"
-  );
-
-  window.leanBiteToastTimer =
-    setTimeout(() => {
-      toast.classList.remove(
-        "is-showing"
-      );
-    }, 2000);
-};
-  const addToCart = (
-    mealId
-  ) => {
-    if (
-      !getMealById(mealId)
-    ) {
+    if (!meal) {
       return;
     }
 
-    const item =
-      state.cart.find(
-        (cartItem) =>
-          cartItem.id ===
-          mealId
-      );
+    var existing = state.cart.find(function (item) {
+      return item.id === mealId;
+    });
 
-    if (item) {
-      item.qty += 1;
+    if (existing) {
+      existing.qty += 1;
     } else {
       state.cart.push({
         id: mealId,
@@ -994,1185 +723,430 @@ const showCartToast = (meal) => {
     }
 
     saveCart();
-renderCart();
+    renderCart();
+    animateCartCount();
+  }
 
-showCartToast(
-  getMealById(mealId)
-);
+  function changeCartQuantity(mealId, difference) {
+    var item = state.cart.find(function (cartItem) {
+      return cartItem.id === mealId;
+    });
 
-el.cartCount?.animate?.(
+    if (!item) {
+      return;
+    }
+
+    item.qty += difference;
+
+    if (item.qty <= 0) {
+      state.cart = state.cart.filter(function (cartItem) {
+        return cartItem.id !== mealId;
+      });
+    }
+
+    saveCart();
+    renderCart();
+  }
+
+  function getCartCount() {
+    return state.cart.reduce(function (total, item) {
+      return total + item.qty;
+    }, 0);
+  }
+
+  function getCartSubtotal() {
+    return state.cart.reduce(function (total, item) {
+      var meal = getMealById(item.id);
+
+      if (!meal || !hasPrice(meal)) {
+        return total;
+      }
+
+      return total + Number(meal.price) * item.qty;
+    }, 0);
+  }
+
+  function cartHasUnpricedItems() {
+    return state.cart.some(function (item) {
+      var meal = getMealById(item.id);
+      return meal && !hasPrice(meal);
+    });
+  }
+
+  function cartItemHTML(item) {
+    var meal = getMealById(item.id);
+
+    if (!meal) {
+      return "";
+    }
+
+    var priceHTML = hasPrice(meal)
+      ? escapeHTML(formatPrice(meal.price))
+      : "Price coming soon";
+
+    return (
+      '<div class="cart-item" data-cart-id="' +
+      escapeHTML(meal.id) +
+      '">' +
+
+      '<img class="cart-item-image" data-leanbite-image src="' +
+      escapeHTML(getMealImage(meal)) +
+      '" alt="' +
+      escapeHTML(meal.name) +
+      '">' +
+
+      '<div>' +
+      '<p class="cart-item-name">' +
+      escapeHTML(meal.name) +
+      "</p>" +
+      createArabicNameHTML(meal, "cart-item-name-ar") +
+
+      '<span class="cart-item-price">' +
+      priceHTML +
+      "</span>" +
+      "</div>" +
+
+      '<div class="cart-qty">' +
+      '<button type="button" data-cart-minus="' +
+      escapeHTML(meal.id) +
+      '" aria-label="Reduce quantity">−</button>' +
+
+      "<span>" +
+      escapeHTML(item.qty) +
+      "</span>" +
+
+      '<button type="button" data-cart-plus="' +
+      escapeHTML(meal.id) +
+      '" aria-label="Increase quantity">+</button>' +
+      "</div>" +
+
+      "</div>"
+    );
+  }
+
+  function renderCart() {
+    cleanCart();
+
+    var count = getCartCount();
+    var subtotal = getCartSubtotal();
+    var hasUnpricedItems = cartHasUnpricedItems();
+
+    if (els.cartCount) {
+      els.cartCount.textContent = count;
+    }
+
+    if (els.cartItems) {
+      els.cartItems.innerHTML = state.cart
+        .map(cartItemHTML)
+        .join("");
+
+      attachImageFallbacks(els.cartItems);
+    }
+
+    if (els.cartEmpty) {
+      els.cartEmpty.hidden = state.cart.length > 0;
+    }
+
+    if (els.cartSummary) {
+      els.cartSummary.hidden = state.cart.length === 0;
+    }
+
+    if (els.cartSubtotal) {
+      if (state.cart.length === 0) {
+        els.cartSubtotal.textContent = formatPrice(0);
+      } else if (hasUnpricedItems && subtotal === 0) {
+        els.cartSubtotal.textContent = "Pending";
+      } else if (hasUnpricedItems) {
+        els.cartSubtotal.textContent =
+          formatPrice(subtotal) + " + pending items";
+      } else {
+        els.cartSubtotal.textContent = formatPrice(subtotal);
+      }
+    }
+  }
+
+  function openCart() {
+    if (!els.cartDrawer) {
+      return;
+    }
+
+    renderCart();
+
+    els.cartDrawer.classList.add("is-open");
+    els.cartDrawer.setAttribute("aria-hidden", "false");
+
+    if (els.cartToggle) {
+      els.cartToggle.setAttribute("aria-expanded", "true");
+    }
+
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeCart() {
+    if (!els.cartDrawer) {
+      return;
+    }
+
+    els.cartDrawer.classList.remove("is-open");
+    els.cartDrawer.setAttribute("aria-hidden", "true");
+
+    if (els.cartToggle) {
+      els.cartToggle.setAttribute("aria-expanded", "false");
+    }
+
+    document.body.style.overflow = "";
+  }
+
+  function animateCartCount() {
+    if (!els.cartCount || !els.cartCount.animate) {
+      return;
+    }
+
+    els.cartCount.animate(
       [
-        {
-          transform:
-            "scale(1)"
-        },
-        {
-          transform:
-            "scale(1.25)"
-        },
-        {
-          transform:
-            "scale(1)"
-        }
+        { transform: "scale(1)" },
+        { transform: "scale(1.25)" },
+        { transform: "scale(1)" }
       ],
       {
         duration: 260,
         easing: "ease-out"
       }
     );
-  };
-
-  const changeQty = (
-    mealId,
-    change
-  ) => {
-    const item =
-      state.cart.find(
-        (cartItem) =>
-          cartItem.id ===
-          mealId
-      );
-
-    if (!item) {
-      return;
-    }
-
-    item.qty += change;
-
-    if (item.qty <= 0) {
-      state.cart =
-        state.cart.filter(
-          (cartItem) =>
-            cartItem.id !==
-            mealId
-        );
-    }
-
-    saveCart();
-    renderCart();
-  };
-
-  const cartCount = () =>
-    state.cart.reduce(
-      (total, item) =>
-        total + item.qty,
-      0
-    );
-
-  const cartSubtotal = () =>
-    state.cart.reduce(
-      (total, item) => {
-        const meal =
-          getMealById(
-            item.id
-          );
-
-        return (
-          meal &&
-          hasPrice(meal)
-        )
-          ? total +
-              Number(
-                meal.price
-              ) *
-                item.qty
-          : total;
-      },
-      0
-    );
-
-  const hasUnpricedItems = () =>
-    state.cart.some(
-      (item) => {
-        const meal =
-          getMealById(
-            item.id
-          );
-
-        return (
-          meal &&
-          !hasPrice(meal)
-        );
-      }
-    );
-
-  const cartItemHTML = (
-    item
-  ) => {
-    const meal =
-      getMealById(
-        item.id
-      );
-
-    if (!meal) {
-      return "";
-    }
-
-    return `
-      <div
-        class="cart-item"
-      >
-
-        <img
-          class="cart-item-image"
-          data-leanbite-image
-          src="${escapeHTML(
-            mealImage(meal)
-          )}"
-          alt="${escapeHTML(
-            meal.name
-          )}"
-        />
-
-        <div>
-
-          <p
-            class="cart-item-name"
-          >
-            ${escapeHTML(
-              meal.name
-            )}
-          </p>
-
-          <span
-            class="cart-item-price"
-          >
-            ${
-              hasPrice(meal)
-                ? escapeHTML(
-                    formatPrice(
-                      meal.price
-                    )
-                  )
-                : "Price coming soon"
-            }
-          </span>
-
-        </div>
-
-        <div
-          class="cart-qty"
-        >
-
-          <button
-            type="button"
-            data-cart-minus="${escapeHTML(
-              meal.id
-            )}"
-            aria-label="Reduce quantity"
-          >
-            −
-          </button>
-
-          <span>
-            ${item.qty}
-          </span>
-
-          <button
-            type="button"
-            data-cart-plus="${escapeHTML(
-              meal.id
-            )}"
-            aria-label="Increase quantity"
-          >
-            +
-          </button>
-
-        </div>
-
-      </div>
-    `;
-  };
-
-  const renderCart = () => {
-    cleanCart();
-
-    const count =
-      cartCount();
-
-    const subtotal =
-      cartSubtotal();
-
-    const pending =
-      hasUnpricedItems();
-
-    if (el.cartCount) {
-      el.cartCount.textContent =
-        count;
-    }
-
-    if (el.cartItems) {
-      el.cartItems.innerHTML =
-        state.cart
-          .map(
-            cartItemHTML
-          )
-          .join("");
-
-      applyImageFallbacks(
-        el.cartItems
-      );
-    }
-
-    if (el.cartEmpty) {
-      el.cartEmpty.hidden =
-        state.cart.length >
-        0;
-    }
-
-    if (el.cartSummary) {
-      el.cartSummary.hidden =
-        state.cart.length ===
-        0;
-    }
-
-    if (el.checkoutOpen) {
-      el.checkoutOpen.disabled =
-        state.cart.length ===
-        0;
-    }
-
-    if (el.cartSubtotal) {
-      el.cartSubtotal.textContent =
-        pending &&
-        subtotal === 0
-          ? "Pending"
-          : pending
-          ? `${formatPrice(
-              subtotal
-            )} + pending items`
-          : formatPrice(
-              subtotal
-            );
-    }
-
-    if (
-      isOpen(
-        el.checkoutModal
-      )
-    ) {
-      renderCheckoutSummary();
-    }
-  };
-
-  const openCart = () => {
-    renderCart();
-
-    el.cartDrawer?.classList.add(
-      "is-open"
-    );
-
-    el.cartDrawer?.setAttribute(
-      "aria-hidden",
-      "false"
-    );
-
-    el.cartToggle?.setAttribute(
-      "aria-expanded",
-      "true"
-    );
-
-    updateBodyLock();
-  };
-
-  const closeCart = () => {
-    el.cartDrawer?.classList.remove(
-      "is-open"
-    );
-
-    el.cartDrawer?.setAttribute(
-      "aria-hidden",
-      "true"
-    );
-
-    el.cartToggle?.setAttribute(
-      "aria-expanded",
-      "false"
-    );
-
-    updateBodyLock();
-  };
+  }
 
   /* =========================================================
-     CHECKOUT
+     14) SEARCH
      ========================================================= */
-
-  const checkoutItemHTML = (
-    item
-  ) => {
-    const meal =
-      getMealById(
-        item.id
-      );
-
-    if (!meal) {
-      return "";
-    }
-
-    const linePrice =
-      hasPrice(meal)
-        ? formatPrice(
-            Number(
-              meal.price
-            ) *
-              item.qty
-          )
-        : "Pending";
-
-    return `
-      <div
-        class="checkout-summary-item"
-      >
-
-        <img
-          class="checkout-summary-image"
-          data-leanbite-image
-          src="${escapeHTML(
-            mealImage(meal)
-          )}"
-          alt="${escapeHTML(
-            meal.name
-          )}"
-        />
-
-        <div>
-
-          <p
-            class="checkout-summary-name"
-          >
-            ${escapeHTML(
-              meal.name
-            )}
-          </p>
-
-          <p
-            class="checkout-summary-meta"
-          >
-            Qty:
-            ${item.qty}
-          </p>
-
-        </div>
-
-        <span
-          class="checkout-summary-price"
-        >
-          ${escapeHTML(
-            linePrice
-          )}
-        </span>
-
-      </div>
-    `;
-  };
-
-  const renderCheckoutSummary =
-    () => {
-      if (
-        !el.checkoutSummaryItems
-      ) {
-        return;
-      }
-
-      cleanCart();
-
-      el.checkoutSummaryItems.innerHTML =
-        state.cart
-          .map(
-            checkoutItemHTML
-          )
-          .join("");
-
-      applyImageFallbacks(
-        el.checkoutSummaryItems
-      );
-
-      if (
-        el.checkoutItemCount
-      ) {
-        el.checkoutItemCount.textContent =
-          cartCount();
-      }
-
-      if (
-        el.checkoutTotal
-      ) {
-        const subtotal =
-          cartSubtotal();
-
-        const pending =
-          hasUnpricedItems();
-
-        el.checkoutTotal.textContent =
-          pending &&
-          subtotal === 0
-            ? "Pending"
-            : pending
-            ? `${formatPrice(
-                subtotal
-              )} + pending`
-            : formatPrice(
-                subtotal
-              );
-      }
-    };
-
-  const clearCheckoutMessage =
-    () => {
-      if (
-        !el.checkoutMessage
-      ) {
-        return;
-      }
-
-      el.checkoutMessage.hidden =
-        true;
-
-      el.checkoutMessage.textContent =
-        "";
-
-      el.checkoutMessage.classList.remove(
-        "is-success",
-        "is-error"
-      );
-    };
-
-  const showCheckoutMessage = (
-    message,
-    type
-  ) => {
-    if (
-      !el.checkoutMessage
-    ) {
+  function openSearch() {
+    if (!els.searchPanel) {
       return;
     }
 
-    el.checkoutMessage.textContent =
-      message;
+    els.searchPanel.hidden = false;
 
-    el.checkoutMessage.hidden =
-      false;
-
-    el.checkoutMessage.classList.remove(
-      "is-success",
-      "is-error"
-    );
-
-    if (type) {
-      el.checkoutMessage.classList.add(
-        type
-      );
+    if (els.searchToggle) {
+      els.searchToggle.setAttribute("aria-expanded", "true");
     }
-  };
 
-  const clearErrors = () => {
-    document
-      .querySelectorAll(
-        ".form-field.has-error"
-      )
-      .forEach((field) =>
-        field.classList.remove(
-          "has-error"
-        )
-      );
+    window.setTimeout(function () {
+      if (els.menuSearch) {
+        els.menuSearch.focus();
+      }
+    }, 30);
+  }
 
-    document
-      .querySelectorAll(
-        ".field-error"
-      )
-      .forEach(
-        (error) =>
-          (error.textContent =
-            "")
-      );
-  };
-
-  const fieldError = (
-    input,
-    message
-  ) => {
-    if (!input) {
+  function closeSearch() {
+    if (!els.searchPanel) {
       return;
     }
 
-    input
-      .closest(".form-field")
-      ?.classList.add(
-        "has-error"
-      );
+    els.searchPanel.hidden = true;
 
-    const error =
-      document.querySelector(
-        `[data-error-for="${input.id}"]`
-      );
-
-    if (error) {
-      error.textContent =
-        message;
+    if (els.searchToggle) {
+      els.searchToggle.setAttribute("aria-expanded", "false");
     }
-  };
+  }
 
-  const validateCheckout =
-    () => {
-      clearErrors();
-      clearCheckoutMessage();
-
-      let valid = true;
-
-      const name =
-        el.customerName?.value.trim() ||
-        "";
-
-      const phone =
-        el.customerPhone?.value.trim() ||
-        "";
-
-      const area =
-        el.customerArea?.value.trim() ||
-        "";
-
-      const address =
-        el.customerAddress?.value.trim() ||
-        "";
-
-      const phoneDigits =
-        phone.replace(
-          /\D/g,
-          ""
-        );
-
-      if (
-        name.length < 2
-      ) {
-        fieldError(
-          el.customerName,
-          "Please enter your full name."
-        );
-
-        valid = false;
-      }
-
-      if (
-        phoneDigits.length <
-          8 ||
-        phoneDigits.length >
-          15
-      ) {
-        fieldError(
-          el.customerPhone,
-          "Please enter a valid phone number."
-        );
-
-        valid = false;
-      }
-
-      if (
-        area.length < 2
-      ) {
-        fieldError(
-          el.customerArea,
-          "Please enter your area or district."
-        );
-
-        valid = false;
-      }
-
-      if (
-        address.length < 5
-      ) {
-        fieldError(
-          el.customerAddress,
-          "Please enter a complete delivery address."
-        );
-
-        valid = false;
-      }
-
-      if (
-        !state.cart.length
-      ) {
-        showCheckoutMessage(
-          "Your cart is empty.",
-          "is-error"
-        );
-
-        valid = false;
-      }
-
-      return valid;
-    };
-
-  /* =========================================================
-     ORDER PAYLOAD
-     Ready for future backend / Odoo connection
-     ========================================================= */
-
-  const buildOrderPayload =
-    () => ({
-      source:
-        "leanbite-menu-web",
-
-      createdAt:
-        new Date().toISOString(),
-
-      customer: {
-        name:
-          el.customerName?.value.trim() ||
-          "",
-
-        phone:
-          el.customerPhone?.value.trim() ||
-          "",
-
-        area:
-          el.customerArea?.value.trim() ||
-          "",
-
-        address:
-          el.customerAddress?.value.trim() ||
-          "",
-
-        notes:
-          el.orderNotes?.value.trim() ||
-          ""
-      },
-
-      currency:
-        DATA.settings
-          .currencyCode ||
-        "IQD",
-
-      items: state.cart
-        .map((item) => {
-          const meal =
-            getMealById(
-              item.id
-            );
-
-          if (!meal) {
-            return null;
-          }
-
-          return {
-            localProductId:
-              meal.id,
-
-            odooProductId:
-              meal.odooProductId ||
-              null,
-
-            name:
-              meal.name,
-
-            quantity:
-              item.qty,
-
-            unitPrice:
-              hasPrice(meal)
-                ? Number(
-                    meal.price
-                  )
-                : null,
-
-            lineTotal:
-              hasPrice(meal)
-                ? Number(
-                    meal.price
-                  ) *
-                  item.qty
-                : null
-          };
-        })
-        .filter(Boolean),
-
-      totals: {
-        itemCount:
-          cartCount(),
-
-        subtotal:
-          cartSubtotal(),
-
-        hasUnpricedItems:
-          hasUnpricedItems()
-      }
-    });
-
-  const openCheckout = () => {
-    if (
-      !el.checkoutModal ||
-      !state.cart.length
-    ) {
+  function toggleSearch() {
+    if (!els.searchPanel) {
       return;
     }
 
-    closeCart();
-
-    clearErrors();
-    clearCheckoutMessage();
-
-    renderCheckoutSummary();
-
-    if (
-      typeof el.checkoutModal
-        .showModal ===
-      "function"
-    ) {
-      el.checkoutModal.showModal();
+    if (els.searchPanel.hidden) {
+      openSearch();
     } else {
-      el.checkoutModal.setAttribute(
-        "open",
-        ""
-      );
+      closeSearch();
     }
+  }
 
-    updateBodyLock();
-
-    setTimeout(
-      () =>
-        el.customerName?.focus(),
-      50
-    );
-  };
-
-  const closeCheckout =
-    () => {
-      if (
-        !el.checkoutModal
-      ) {
-        return;
-      }
-
-      if (
-        typeof el.checkoutModal
-          .close ===
-          "function" &&
-        el.checkoutModal.open
-      ) {
-        el.checkoutModal.close();
-      } else {
-        el.checkoutModal.removeAttribute(
-          "open"
-        );
-      }
-
-      updateBodyLock();
-    };
-
-  const submitCheckout = (
-    event
-  ) => {
-    event.preventDefault();
-
-    if (
-      !validateCheckout()
-    ) {
-      return;
-    }
-
-    const payload =
-      buildOrderPayload();
-
-    /*
-      Ready for backend / Odoo.
-
-      IMPORTANT:
-      Nothing is transmitted yet.
-    */
-
-    window.LEAN_BITE_LAST_ORDER =
-      payload;
-
-    console.log(
-      "Lean Bite order payload ready for backend:",
-      payload
-    );
-
-    showCheckoutMessage(
-      "Order details are ready. Odoo submission will be connected in the backend phase.",
-      "is-success"
-    );
-  };
-
-  /* =========================================================
-     SEARCH
-     ========================================================= */
-
-  const toggleSearch = () => {
-    if (
-      !el.searchPanel
-    ) {
-      return;
-    }
-
-    el.searchPanel.hidden =
-      !el.searchPanel.hidden;
-
-    el.searchToggle?.setAttribute(
-      "aria-expanded",
-      el.searchPanel.hidden
-        ? "false"
-        : "true"
-    );
-
-    if (
-      !el.searchPanel.hidden
-    ) {
-      setTimeout(
-        () =>
-          el.menuSearch?.focus(),
-        30
-      );
-    }
-  };
-
-  const clearSearch = () => {
+  function clearSearch() {
     state.searchTerm = "";
 
-    if (
-      el.menuSearch
-    ) {
-      el.menuSearch.value =
-        "";
-
-      el.menuSearch.focus();
+    if (els.menuSearch) {
+      els.menuSearch.value = "";
+      els.menuSearch.focus();
     }
 
     renderMenu();
-  };
-
-  /* =========================================================
-     EVENTS
+  }  /* =========================================================
+     15) EVENT LISTENERS
      ========================================================= */
 
-  el.categoryNavInner?.addEventListener(
-    "click",
-    (event) => {
-      const button =
-        event.target.closest(
-          "[data-category]"
-        );
+  if (els.categoryNavInner) {
+    els.categoryNavInner.addEventListener("click", function (event) {
+      var button = event.target.closest("[data-category]");
 
-      if (button) {
-        setActiveCategory(
-          button.dataset
-            .category
-        );
-      }
-    }
-  );
-
-  el.searchToggle?.addEventListener(
-    "click",
-    toggleSearch
-  );
-
-  el.searchClear?.addEventListener(
-    "click",
-    clearSearch
-  );
-
-  el.menuSearch?.addEventListener(
-    "input",
-    (event) => {
-      state.searchTerm =
-        event.target.value ||
-        "";
-
-      renderMenu();
-    }
-  );
-
-  el.menuGrid?.addEventListener(
-    "click",
-    (event) => {
-      const add =
-        event.target.closest(
-          "[data-add-meal]"
-        );
-
-      if (add) {
-        event.stopPropagation();
-
-        addToCart(
-          add.dataset
-            .addMeal
-        );
-
+      if (!button) {
         return;
       }
 
-      const card =
-        event.target.closest(
-          "[data-meal-id]"
-        );
+      setActiveCategory(button.dataset.category);
+    });
+  }
+
+  if (els.searchToggle) {
+    els.searchToggle.addEventListener("click", toggleSearch);
+  }
+
+  if (els.searchClear) {
+    els.searchClear.addEventListener("click", clearSearch);
+  }
+
+  if (els.menuSearch) {
+    els.menuSearch.addEventListener("input", function (event) {
+      state.searchTerm = event.target.value || "";
+      renderMenu();
+    });
+  }
+
+  if (els.menuGrid) {
+    els.menuGrid.addEventListener("click", function (event) {
+      var addButton = event.target.closest("[data-add-meal]");
+
+      if (addButton) {
+        event.stopPropagation();
+        addToCart(addButton.dataset.addMeal);
+        return;
+      }
+
+      var card = event.target.closest("[data-meal-id]");
 
       if (card) {
-        openMealModal(
-          card.dataset
-            .mealId
-        );
+        openMealModal(card.dataset.mealId);
       }
-    }
-  );
+    });
 
-  el.menuGrid?.addEventListener(
-    "keydown",
-    (event) => {
-      if (
-        ![
-          "Enter",
-          " "
-        ].includes(
-          event.key
-        )
-      ) {
+    els.menuGrid.addEventListener("keydown", function (event) {
+      if (event.key !== "Enter" && event.key !== " ") {
         return;
       }
 
-      const card =
-        event.target.closest(
-          "[data-meal-id]"
-        );
+      var card = event.target.closest("[data-meal-id]");
 
       if (!card) {
         return;
       }
 
       event.preventDefault();
+      openMealModal(card.dataset.mealId);
+    });
+  }
 
-      openMealModal(
-        card.dataset
-          .mealId
-      );
-    }
-  );
+  if (els.mealModalClose) {
+    els.mealModalClose.addEventListener("click", closeMealModal);
+  }
 
-  el.mealModalClose?.addEventListener(
-    "click",
-    closeMealModal
-  );
-
-  el.mealModalAdd?.addEventListener(
-    "click",
-    () => {
-      if (
-        !state.selectedMealId
-      ) {
+  if (els.mealModalAdd) {
+    els.mealModalAdd.addEventListener("click", function () {
+      if (!state.selectedMealId) {
         return;
       }
 
-      addToCart(
-        state.selectedMealId
-      );
-
+      addToCart(state.selectedMealId);
       closeMealModal();
       openCart();
-    }
-  );
+    });
+  }
 
-  el.mealModal?.addEventListener(
-    "click",
-    (event) => {
-      if (
-        event.target ===
-        el.mealModal
-      ) {
+  if (els.mealModal) {
+    els.mealModal.addEventListener("click", function (event) {
+      if (event.target === els.mealModal) {
         closeMealModal();
       }
-    }
-  );
+    });
 
-  el.mealModal?.addEventListener(
-    "cancel",
-    (event) => {
+    els.mealModal.addEventListener("cancel", function (event) {
       event.preventDefault();
       closeMealModal();
-    }
-  );
+    });
+  }
 
-  el.cartToggle?.addEventListener(
-    "click",
-    openCart
-  );
+  if (els.cartToggle) {
+    els.cartToggle.addEventListener("click", openCart);
+  }
 
-  el.cartClose?.addEventListener(
-    "click",
-    closeCart
-  );
+  if (els.cartClose) {
+    els.cartClose.addEventListener("click", closeCart);
+  }
 
-  el.cartBackdrop?.addEventListener(
-    "click",
-    closeCart
-  );
+  if (els.cartBackdrop) {
+    els.cartBackdrop.addEventListener("click", closeCart);
+  }
 
-  el.cartItems?.addEventListener(
-    "click",
-    (event) => {
-      const plus =
-        event.target.closest(
-          "[data-cart-plus]"
-        );
-
-      const minus =
-        event.target.closest(
-          "[data-cart-minus]"
-        );
+  if (els.cartItems) {
+    els.cartItems.addEventListener("click", function (event) {
+      var plus = event.target.closest("[data-cart-plus]");
+      var minus = event.target.closest("[data-cart-minus]");
 
       if (plus) {
-        changeQty(
-          plus.dataset.cartPlus,
-          1
-        );
+        changeCartQuantity(plus.dataset.cartPlus, 1);
+        return;
       }
 
       if (minus) {
-        changeQty(
-          minus.dataset
-            .cartMinus,
-          -1
-        );
+        changeCartQuantity(minus.dataset.cartMinus, -1);
       }
-    }
-  );
+    });
+  }
 
-  el.checkoutOpen?.addEventListener(
-    "click",
-    openCheckout
-  );
-
-  el.checkoutClose?.addEventListener(
-    "click",
-    closeCheckout
-  );
-
-  el.checkoutForm?.addEventListener(
-    "submit",
-    submitCheckout
-  );
-
-  el.checkoutModal?.addEventListener(
-    "click",
-    (event) => {
-      if (
-        event.target ===
-        el.checkoutModal
-      ) {
-        closeCheckout();
+  if (els.viewAllOffers) {
+    els.viewAllOffers.addEventListener("click", function () {
+      if (!els.offersTrack) {
+        return;
       }
-    }
-  );
 
-  el.checkoutModal?.addEventListener(
-    "cancel",
-    (event) => {
-      event.preventDefault();
-      closeCheckout();
-    }
-  );
-
-  [
-    el.customerName,
-    el.customerPhone,
-    el.customerArea,
-    el.customerAddress
-  ].forEach(
-    (input) => {
-      input?.addEventListener(
-        "input",
-        () => {
-          input
-            .closest(
-              ".form-field"
-            )
-            ?.classList.remove(
-              "has-error"
-            );
-
-          const error =
-            document.querySelector(
-              `[data-error-for="${input.id}"]`
-            );
-
-          if (error) {
-            error.textContent =
-              "";
-          }
-
-          clearCheckoutMessage();
-        }
-      );
-    }
-  );
-
-  el.viewAllOffers?.addEventListener(
-    "click",
-    () => {
-      el.offersTrack?.scrollTo({
+      els.offersTrack.scrollTo({
         left: 0,
         behavior: "smooth"
       });
-    }
-  );
-
-  document.addEventListener(
-    "keydown",
-    (event) => {
-      if (
-        event.key !==
-        "Escape"
-      ) {
-        return;
-      }
-
-      if (
-        isOpen(
-          el.checkoutModal
-        )
-      ) {
-        closeCheckout();
-        return;
-      }
-
-      if (
-        el.cartDrawer?.classList.contains(
-          "is-open"
-        )
-      ) {
-        closeCart();
-        return;
-      }
-
-      if (
-        isOpen(
-          el.mealModal
-        )
-      ) {
-        closeMealModal();
-      }
-    }
-  );
-
-  /* =========================================================
-     INIT
-     ========================================================= */
-
-  renderCategories();
-  renderOffers();
-  renderMenu();
-  renderCart();
-
-  if (
-    el.copyrightYear
-  ) {
-    el.copyrightYear.textContent =
-      `© ${new Date().getFullYear()} ${
-        DATA.settings
-          .brandName ||
-        "Lean Bite"
-      }`;
+    });
   }
 
-  console.log(
-    `Lean Bite loaded with ${getMeals().length} available items.`
-  );
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") {
+      return;
+    }
+
+    if (
+      els.cartDrawer &&
+      els.cartDrawer.classList.contains("is-open")
+    ) {
+      closeCart();
+      return;
+    }
+
+    if (
+      els.mealModal &&
+      els.mealModal.hasAttribute("open")
+    ) {
+      closeMealModal();
+    }
+  });
+
+  /* =========================================================
+     16) INITIAL APP RENDER
+     ========================================================= */
+  function init() {
+    renderCategories();
+    renderOffers();
+    renderMenu();
+    renderCart();
+
+    if (els.copyrightYear) {
+      els.copyrightYear.textContent =
+        "© " +
+        new Date().getFullYear() +
+        " " +
+        (DATA.settings.brandName || "Lean Bite");
+    }
+
+    console.log(
+      "Lean Bite Menu front end loaded with " +
+      getMeals().length +
+      " available items."
+    );
+  }
+
+  init();
 })();
